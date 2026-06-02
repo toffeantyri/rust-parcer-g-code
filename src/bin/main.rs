@@ -1,15 +1,15 @@
-аuse code_parser::{lexer, parser, formatter};
+//use code_parser::{lexer, parser, formatter};
 
 fn main() {
     println!("🚀 Запуск парсера и форматтера...");
-    
+
     let input = "пример кода для разбора";
-    
+
     // Пока используем заглушки — нужно убедиться, что модули экспортируют эти функции
     let tokens = lexer::lex(input);
     let ast = parser::parse(&tokens);
     let formatted = formatter::format(&ast);
-    
+
     println!("Отформатированный код: {}", formatted);
 }
 

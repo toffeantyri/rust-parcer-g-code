@@ -41,7 +41,7 @@ impl Formatter {
         }
 
         // Добавляем последнюю строку, если она не закончилась переводом строки
-n        if !line_parts.is_empty() {
+        if !line_parts.is_empty() {
             result.push_str(&self.format_line(&line_parts));
         }
 
@@ -83,13 +83,31 @@ mod tests {
     #[test]
     fn test_format_simple_program() {
         let mut program = Vec::new();
-        program.push(Statement::Motion(MotionStatement { code: 0, rapid: true }));
-        program.push(Statement::Axis(AxisStatement { axis: "X".to_string(), value: 10.0 }));
-        program.push(Statement::Axis(AxisStatement { axis: "Y".to_string(), value: 20.0 }));
+        program.push(Statement::Motion(MotionStatement {
+            code: 0,
+            rapid: true,
+        }));
+        program.push(Statement::Axis(AxisStatement {
+            axis: "X".to_string(),
+            value: 10.0,
+        }));
+        program.push(Statement::Axis(AxisStatement {
+            axis: "Y".to_string(),
+            value: 20.0,
+        }));
         program.push(Statement::NewLine);
-        program.push(Statement::Motion(MotionStatement { code: 1, rapid: false }));
-        program.push(Statement::Axis(AxisStatement { axis: "Z".to_string(), value: 5.5 }));
-        program.push(Statement::Axis(AxisStatement { axis: "F".to_string(), value: 100.0 }));
+        program.push(Statement::Motion(MotionStatement {
+            code: 1,
+            rapid: false,
+        }));
+        program.push(Statement::Axis(AxisStatement {
+            axis: "Z".to_string(),
+            value: 5.5,
+        }));
+        program.push(Statement::Axis(AxisStatement {
+            axis: "F".to_string(),
+            value: 100.0,
+        }));
 
         let formatter = Formatter::new();
         let result = formatter.format_program(&program);
