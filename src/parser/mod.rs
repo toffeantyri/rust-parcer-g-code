@@ -45,7 +45,7 @@ impl Parser {
     /// 
     /// # Пример
     /// ```
-    /// let lexer = Lexer::new("G0 X10\nG1 Z5.5".to_string());
+    /// let lexer = Lexer::new("G0 X10\\nG1 Z5.5".to_string());
     /// let mut parser = Parser::new(lexer);
     /// let program = parser.parse_program();
     /// assert_eq!(program.len(), 5);
@@ -84,6 +84,7 @@ impl Parser {
                 value: *value,
             })),
             Token::Comment(text) => Some(Statement::Comment(CommentStatement { text: text.clone() })),
+            Token::NewLine => Some(Statement::NewLine),
             // Для любых неизвестных токенов или специфических конструкций
             _ => {
                 // Сохраняем оригинальное представление, чтобы не терять специфические конструкции
@@ -130,12 +131,13 @@ mod tests {
         let mut parser = Parser::new(lexer);
         let program = parser.parse_program();
 
-        assert_eq!(program.len(), 6);
+        assert_eq!(program.len(), 7);
         assert_eq!(program[0], Statement::Motion(MotionStatement { code: 0, rapid: true }));
         assert_eq!(program[1], Statement::Axis(AxisStatement { axis: "X".to_string(), value: 10.0 }));
         assert_eq!(program[2], Statement::Axis(AxisStatement { axis: "Y".to_string(), value: 20.0 }));
         assert_eq!(program[3], Statement::NewLine);
         assert_eq!(program[4], Statement::Motion(MotionStatement { code: 1, rapid: false }));
         assert_eq!(program[5], Statement::Axis(AxisStatement { axis: "Z".to_string(), value: 5.5 }));
+        assert_eq!(program[6], Statement::Axis(AxisStatement { axis: "F".to_string(), value: 100.0 }));
     }
 }

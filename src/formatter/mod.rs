@@ -28,7 +28,7 @@ impl Formatter {
                         result.push_str(&self.format_line(&line_parts));
                         line_parts.clear();
                     }
-                    result.push('\n');
+                    // Не добавляем дополнительный \n - он уже есть в format_line
                 }
                 Statement::Raw(raw) => {
                     // Сохраняем оригинальные конструкции без изменений
