@@ -6,7 +6,7 @@ use std::fs;
 use std::process;
 
 use crate::application::{FormatConfig, Formatter, Parser};
-use crate::infrastructure::Lexer;
+use crate::infrastructure::lexer::tokenize;
 
 /// Запускает полный цикл: чтение файла -> лексинг -> парсинг -> форматирование -> вывод
 pub fn run(input_path: &str) {
@@ -24,15 +24,7 @@ pub fn run(input_path: &str) {
     }
 
     // Лексинг: текст -> токены
-    let mut lexer = Lexer::new(input_content);
-    let mut tokens = Vec::new();
-    loop {
-        let token = lexer.next_token();
-        if token == crate::domain::Token::Eof {
-            break;
-        }
-        tokens.push(token);
-    }
+    let tokens = tokenize(&input_content);
 
     // Парсинг: токены -> AST
     let mut parser = Parser::new(tokens);
