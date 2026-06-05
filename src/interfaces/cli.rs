@@ -19,6 +19,10 @@ pub fn run(input_path: &str) {
         }
     };
 
+    if cfg!(debug_assertions) {
+        println!("Контент файла: \n{}", input_content)
+    }
+
     // Лексинг: текст -> токены
     let mut lexer = Lexer::new(input_content);
     let mut tokens = Vec::new();
