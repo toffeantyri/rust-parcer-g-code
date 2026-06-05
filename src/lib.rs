@@ -1,7 +1,14 @@
-// Main module file
+//! Парсер и форматтер G-кода
+//!
+//! Архитектура: Clean Architecture
+//! - domain: сущности (AST, Token)
+//! - application: use cases (парсер, форматтер)
+//! - infrastructure: внешние зависимости (лексер, ввод-вывод)
+//! - interfaces: CLI/API обработчики
+//! - shared: общие типы (ошибки, конфиги)
 
-pub mod ast;
-pub mod formatter;
-pub mod lexer;
-pub mod parser;
-//pub mod utils;
+pub mod application;
+pub mod domain;
+pub mod infrastructure;
+pub mod interfaces;
+pub mod shared;
