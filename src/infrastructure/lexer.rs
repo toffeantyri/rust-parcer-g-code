@@ -128,7 +128,11 @@ impl Lexer {
                 _ => {
                     // Проверяем, является ли буква осью
                     if "XYZABCUVWRFSIJKR".contains(letter.as_str()) {
-                        // Если после буквы идёт число или минус — читаем значение оси
+                        // Если после буквы идёт `=`, читаем выражение
+                        if self.ch == '=' {
+                            return self.read_axis_expr(letter);
+                        }
+                        // Если после буквы идёт число или минус — читаем числовое значение оси
                         if self.ch.is_ascii_digit() || self.ch == '-' || self.ch == '.' {
                             let value = self.read_number();
                             return Token::Axis(letter, value);
@@ -199,6 +203,19 @@ impl Lexer {
         content.push_str(&inner);
         content.push(')');
         Token::Word(content)
+    }
+
+    /// Читает выражение оси после `=`: ось + `=` + арифметическое выражение до пробела.
+    /// Например Z=71.304, X=160+10, Y=100*2.
+    fn read_axis_expr(&mut self, axis: String) -> Token {
+        self.read_char(); // пропускаем `=`
+        let mut expr = String::new();
+        // Читаем всё до пробела, новой строки или `;`
+        while self.ch != '\0' && !self.ch.is_whitespace() && self.ch != ';' {
+            expr.push(self.ch);
+            self.read_char();
+        }
+        Token::AxisExpr(axis, expr)
     }
 
     /// Читает число (целое или с плавающей точкой)
@@ -293,6 +310,24 @@ mod tests {
         assert_eq!(tokens[0], Token::GCode(0));
         assert_eq!(tokens[1], Token::Axis("X".to_string(), -10.0));
         assert_eq!(tokens[2], Token::Axis("Y".to_string(), -20.5));
+    }
+
+    #[test]
+    fn test_axis_expr() {
+        let tokens = tokenize("Z=71.304 X=160+10 Y=3*5/2");
+
+        assert_eq!(
+            tokens[0],
+            Token::AxisExpr("Z".to_string(), "71.304".to_string())
+        );
+        assert_eq!(
+            tokens[1],
+            Token::AxisExpr("X".to_string(), "160+10".to_string())
+        );
+        assert_eq!(
+            tokens[2],
+            Token::AxisExpr("Y".to_string(), "3*5/2".to_string())
+        );
     }
 
     #[test]

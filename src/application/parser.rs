@@ -50,6 +50,9 @@ impl Parser {
                 axis: axis.clone(),
                 value: *value,
             }))),
+            Token::AxisExpr(axis, expr) => {
+                Ok(Some(Statement::Word(format!("{}=", axis) + expr.as_str())))
+            }
             Token::Comment(text) => Ok(Some(Statement::Comment(CommentStatement {
                 text: text.clone(),
             }))),
@@ -80,6 +83,7 @@ impl Parser {
             Token::GCode(code) => format!("G{}", code),
             Token::MCode(code) => format!("M{}", code),
             Token::Axis(axis, value) => format!("{}{}", axis, value),
+            Token::AxisExpr(axis, expr) => format!("{}={}", axis, expr),
             Token::Word(word) => word.clone(),
             Token::NCode(code) => format!("N{:04}", code),
             Token::Number(value) => value.to_string(),
