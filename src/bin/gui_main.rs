@@ -197,18 +197,18 @@ fn main() {
 
     // --- О программе ---
     ui.on_menu_help_about(|| {
-        eprintln!("G-Code Editor v0.1");
-        eprintln!("Форматировщик и валидатор G-кода для станков с ЧПУ.");
-        eprintln!("Архитектура: Clean Architecture + Slint UI");
+        println!("G-Code Editor v0.1");
+        println!("Форматировщик и валидатор G-кода для станков с ЧПУ.");
+        println!("Архитектура: Clean Architecture + Slint UI");
     });
 
     // --- Горячие клавиши ---
     ui.on_menu_help_shortcuts(|| {
-        eprintln!("Горячие клавиши:");
-        eprintln!("  F5     — Форматировать");
-        eprintln!("  F6     — Проверить ошибки");
-        eprintln!("  Ctrl+O — Открыть файл");
-        eprintln!("  Ctrl+S — Сохранить");
+        println!("Горячие клавиши:");
+        println!("  F5     — Форматировать");
+        println!("  F6     — Проверить ошибки");
+        println!("  Ctrl+O — Открыть файл");
+        println!("  Ctrl+S — Сохранить");
     });
 
     ui.run().unwrap();
