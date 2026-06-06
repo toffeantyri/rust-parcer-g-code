@@ -132,11 +132,13 @@ impl Lexer {
                         if self.ch == '=' {
                             return self.read_axis_expr(letter);
                         }
-                        // Если после буквы идёт число или минус — читаем числовое значение оси
+                        // Если после буквы идёт число, минус или точка — читаем числовое значение оси
                         if self.ch.is_ascii_digit() || self.ch == '-' || self.ch == '.' {
                             let value = self.read_number();
-                            return Token::Axis(letter, value);
+                            return Token::Axis(letter, Some(value));
                         }
+                        // Ось без числа — оставляем None (будет ошибкой валидации)
+                        return Token::Axis(letter, None);
                     }
                     // Одиночная неизвестная буква — Word
                     return Token::Word(word);
@@ -281,14 +283,14 @@ mod tests {
         let tokens = tokenize("G0 X10 Y20 (Rapid move)\nG1 Z5.5 F100");
 
         assert_eq!(tokens[0], Token::GCode(0));
-        assert_eq!(tokens[1], Token::Axis("X".to_string(), 10.0));
-        assert_eq!(tokens[2], Token::Axis("Y".to_string(), 20.0));
+        assert_eq!(tokens[1], Token::Axis("X".to_string(), Some(10.0)));
+        assert_eq!(tokens[2], Token::Axis("Y".to_string(), Some(20.0)));
         // Скобки — не комментарий, а скобочное выражение (Word)
         assert_eq!(tokens[3], Token::Word("(Rapid move)".to_string()));
         assert_eq!(tokens[4], Token::NewLine);
         assert_eq!(tokens[5], Token::GCode(1));
-        assert_eq!(tokens[6], Token::Axis("Z".to_string(), 5.5));
-        assert_eq!(tokens[7], Token::Axis("F".to_string(), 100.0));
+        assert_eq!(tokens[6], Token::Axis("Z".to_string(), Some(5.5)));
+        assert_eq!(tokens[7], Token::Axis("F".to_string(), Some(100.0)));
     }
 
     #[test]
@@ -296,11 +298,11 @@ mod tests {
         let tokens = tokenize("G0 X10 ; this is a comment\nG1 Y20");
 
         assert_eq!(tokens[0], Token::GCode(0));
-        assert_eq!(tokens[1], Token::Axis("X".to_string(), 10.0));
+        assert_eq!(tokens[1], Token::Axis("X".to_string(), Some(10.0)));
         assert_eq!(tokens[2], Token::Comment(" this is a comment".to_string()));
         assert_eq!(tokens[3], Token::NewLine);
         assert_eq!(tokens[4], Token::GCode(1));
-        assert_eq!(tokens[5], Token::Axis("Y".to_string(), 20.0));
+        assert_eq!(tokens[5], Token::Axis("Y".to_string(), Some(20.0)));
     }
 
     #[test]
@@ -308,8 +310,8 @@ mod tests {
         let tokens = tokenize("G0 X-10 Y-20.5");
 
         assert_eq!(tokens[0], Token::GCode(0));
-        assert_eq!(tokens[1], Token::Axis("X".to_string(), -10.0));
-        assert_eq!(tokens[2], Token::Axis("Y".to_string(), -20.5));
+        assert_eq!(tokens[1], Token::Axis("X".to_string(), Some(-10.0)));
+        assert_eq!(tokens[2], Token::Axis("Y".to_string(), Some(-20.5)));
     }
 
     #[test]
@@ -350,7 +352,7 @@ mod tests {
             tokens[1],
             Token::Word("(comment (nested) content)".to_string())
         );
-        assert_eq!(tokens[2], Token::Axis("X".to_string(), 10.0));
+        assert_eq!(tokens[2], Token::Axis("X".to_string(), Some(10.0)));
     }
 
     #[test]
@@ -360,7 +362,7 @@ mod tests {
         // Скобочные аргументы — часть слова
         assert_eq!(tokens[0], Token::Word("MODECHECK(2)".to_string()));
         assert_eq!(tokens[1], Token::Word("TRANS".to_string()));
-        assert_eq!(tokens[2], Token::Axis("Z".to_string(), -8.0));
+        assert_eq!(tokens[2], Token::Axis("Z".to_string(), Some(-8.0)));
         assert_eq!(
             tokens[3],
             Token::Word("MATLCH(\"DISKD125\",0,1)".to_string())
@@ -382,8 +384,8 @@ mod tests {
         // Строки начинающиеся с оси (продолжение предыдущего G-кода)
         let tokens = tokenize(" Z71.304\n Y-58.346");
 
-        assert_eq!(tokens[0], Token::Axis("Z".to_string(), 71.304));
+        assert_eq!(tokens[0], Token::Axis("Z".to_string(), Some(71.304)));
         assert_eq!(tokens[1], Token::NewLine);
-        assert_eq!(tokens[2], Token::Axis("Y".to_string(), -58.346));
+        assert_eq!(tokens[2], Token::Axis("Y".to_string(), Some(-58.346)));
     }
 }

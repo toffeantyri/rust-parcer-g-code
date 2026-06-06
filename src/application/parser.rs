@@ -82,7 +82,13 @@ impl Parser {
         match token {
             Token::GCode(code) => format!("G{}", code),
             Token::MCode(code) => format!("M{}", code),
-            Token::Axis(axis, value) => format!("{}{}", axis, value),
+            Token::Axis(axis, value) => {
+                if let Some(v) = value {
+                    format!("{}{}", axis, v)
+                } else {
+                    axis.clone()
+                }
+            }
             Token::AxisExpr(axis, expr) => format!("{}={}", axis, expr),
             Token::Word(word) => word.clone(),
             Token::NCode(code) => format!("N{:04}", code),
@@ -119,14 +125,14 @@ mod tests {
             program[1],
             Statement::Axis(AxisStatement {
                 axis: "X".to_string(),
-                value: 10.0
+                value: Some(10.0)
             })
         );
         assert_eq!(
             program[2],
             Statement::Axis(AxisStatement {
                 axis: "Y".to_string(),
-                value: 20.0
+                value: Some(20.0)
             })
         );
         assert_eq!(program[3], Statement::NewLine);
@@ -141,7 +147,7 @@ mod tests {
             program[5],
             Statement::Axis(AxisStatement {
                 axis: "Z".to_string(),
-                value: 5.5
+                value: Some(5.5)
             })
         );
     }

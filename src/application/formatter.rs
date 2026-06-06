@@ -16,7 +16,7 @@ impl Default for FormatConfig {
             indent_size: 2,
             use_spaces: true,
             uppercase_codes: true,
-            decimal_places: 4,
+            decimal_places: 5,
         }
     }
 }
@@ -101,12 +101,12 @@ impl Formatter {
                 format!("{}{}", prefix, m.code)
             }
             Statement::Axis(a) => {
-                format!(
-                    "{}{:.prec$}",
-                    a.axis,
-                    a.value,
-                    prec = self.config.decimal_places
-                )
+                if let Some(v) = a.value {
+                    format!("{}{:.prec$}", a.axis, v, prec = self.config.decimal_places)
+                } else {
+                    // Ось без значения — выводим как есть (будет ошибкой валидации)
+                    a.axis.clone()
+                }
             }
             Statement::Comment(c) => format!(";{}", c.text),
             Statement::Raw(raw) => raw.clone(),
@@ -134,11 +134,11 @@ mod tests {
             }),
             Statement::Axis(AxisStatement {
                 axis: "X".to_string(),
-                value: 10.0,
+                value: Some(10.0),
             }),
             Statement::Axis(AxisStatement {
                 axis: "Y".to_string(),
-                value: 20.0,
+                value: Some(20.0),
             }),
             Statement::NewLine,
             Statement::Motion(MotionStatement {
@@ -147,18 +147,18 @@ mod tests {
             }),
             Statement::Axis(AxisStatement {
                 axis: "Z".to_string(),
-                value: 5.5,
+                value: Some(5.5),
             }),
             Statement::Axis(AxisStatement {
                 axis: "F".to_string(),
-                value: 100.0,
+                value: Some(100.0),
             }),
         ];
 
         let formatter = Formatter::new(FormatConfig::default());
         let result = formatter.format_program(&program);
 
-        let expected = "G0 X10.0000 Y20.0000\nG1 Z5.5000 F100.0000\n";
+        let expected = "G0 X10.00000 Y20.00000\nG1 Z5.50000 F100.00000\n";
         assert_eq!(result, expected);
     }
 

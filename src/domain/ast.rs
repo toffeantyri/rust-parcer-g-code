@@ -37,10 +37,11 @@ pub struct MiscStatement {
 }
 
 /// Координата оси (X10.5, Y20.0...)
+/// Если значение None — ось указана без числа (ошибка: `X` без значения)
 #[derive(Debug, Clone, PartialEq)]
 pub struct AxisStatement {
     pub axis: String,
-    pub value: f64,
+    pub value: Option<f64>,
 }
 
 /// Комментарий
@@ -56,7 +57,13 @@ impl fmt::Display for Statement {
             Statement::NCode(code) => write!(f, "N{:04}", code),
             Statement::Word(word) => write!(f, "{}", word),
             Statement::Misc(m) => write!(f, "M{}", m.code),
-            Statement::Axis(a) => write!(f, "{}{}", a.axis, a.value),
+            Statement::Axis(a) => {
+                if let Some(v) = a.value {
+                    write!(f, "{}{}", a.axis, v)
+                } else {
+                    write!(f, "{}", a.axis)
+                }
+            }
             Statement::Comment(c) => write!(f, ";{}", c.text),
             Statement::Raw(r) => write!(f, "{}", r),
             Statement::NewLine => write!(f, "\n"),
@@ -76,7 +83,7 @@ mod tests {
         });
         let axis = Statement::Axis(AxisStatement {
             axis: "X".to_string(),
-            value: 10.5,
+            value: Some(10.5),
         });
         let comment = Statement::Comment(CommentStatement {
             text: "Test move".to_string(),

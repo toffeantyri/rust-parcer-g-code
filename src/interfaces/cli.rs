@@ -5,10 +5,10 @@
 use std::fs;
 use std::process;
 
-use crate::application::{FormatConfig, Formatter, Parser};
+use crate::application::{validate, FormatConfig, Formatter, Parser, Severity};
 use crate::infrastructure::lexer::tokenize;
 
-/// Запускает полный цикл: чтение файла -> лексинг -> парсинг -> форматирование -> вывод
+/// Запускает полный цикл: чтение файла -> лексинг -> парсинг -> валидация -> форматирование -> вывод
 pub fn run(input_path: &str) {
     // Чтение входного файла (infrastructure — работа с файловой системой)
     let input_content = match fs::read_to_string(input_path) {
@@ -35,6 +35,27 @@ pub fn run(input_path: &str) {
             process::exit(1);
         }
     };
+
+    // Валидация: проверка AST на ошибки
+    let validation_messages = validate(&program);
+    let has_errors = validation_messages
+        .iter()
+        .any(|m| m.severity == Severity::Error);
+
+    for msg in &validation_messages {
+        let level = match msg.severity {
+            Severity::Error => "ОШИБКА",
+            Severity::Warning => "ПРЕДУПРЕЖДЕНИЕ",
+        };
+        eprintln!("{} [{}]: {}", level, msg.location, msg.message);
+    }
+
+    // Если есть критические ошибки — не выводим результат
+    if has_errors {
+        eprintln!();
+        eprintln!("Найдены критические ошибки. Форматирование отменено.");
+        process::exit(1);
+    }
 
     // Форматирование: AST -> строка
     let formatter = Formatter::new(FormatConfig::default());
