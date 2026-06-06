@@ -1,77 +1,36 @@
 //! Прикладной слой: валидатор — проверяет AST на синтаксические ошибки
 //!
-//! Распознаваемые ошибки:
+//! Проверки:
 //! - Ось без значения (например одинокий `X` без числа)
-//! - G-код или M-код с кодом 0 (если 0 не был явно указан — а был результатом ошибки чтения)
-//! - Две оси подряд (не реализовано на уровне токенов, только если есть подозрительные Raw)
+//! - Пустая программа
 
 use crate::domain::Statement;
-
-/// Степень серьёзности ошибки валидации
-#[derive(Debug, Clone, PartialEq)]
-pub enum Severity {
-    /// Критическая ошибка — форматирование блокируется
-    Error,
-    /// Предупреждение — форматирование продолжается
-    Warning,
-}
-
-/// Результат проверки одного оператора
-#[derive(Debug, Clone, PartialEq)]
-pub struct ValidationMessage {
-    pub severity: Severity,
-    pub message: String,
-    /// Человеко-читаемое описание где найдена проблема
-    pub location: String,
-}
-
-impl ValidationMessage {
-    pub fn error(location: impl Into<String>, message: impl Into<String>) -> Self {
-        ValidationMessage {
-            severity: Severity::Error,
-            message: message.into(),
-            location: location.into(),
-        }
-    }
-
-    pub fn warning(location: impl Into<String>, message: impl Into<String>) -> Self {
-        ValidationMessage {
-            severity: Severity::Warning,
-            message: message.into(),
-            location: location.into(),
-        }
-    }
-}
+use crate::shared::ValidationMessage;
 
 /// Проверяет программу (AST) на синтаксические ошибки.
-/// Возвращает список сообщений валидации.
+/// Возвращает список сообщений валидации с номерами строк.
 pub fn validate(program: &[Statement]) -> Vec<ValidationMessage> {
     let mut messages = Vec::new();
 
     if program.is_empty() {
-        messages.push(ValidationMessage::error("program", "Программа пуста"));
+        messages.push(ValidationMessage::error(0, "Программа пуста"));
         return messages;
     }
 
-    let mut line_number: usize = 0;
+    // Номер текущей строки (1-based)
+    let mut line: usize = 1;
 
     for stmt in program {
         match stmt {
             Statement::NewLine => {
-                line_number += 1;
+                line += 1;
             }
             Statement::Axis(a) => {
                 if a.value.is_none() {
                     messages.push(ValidationMessage::error(
-                        format!("строка {}", line_number + 1),
+                        line,
                         format!("Ось '{}' указана без значения", a.axis),
                     ));
-                }
-            }
-            Statement::Motion(m) => {
-                // G0 — это валидный код (быстрое перемещение)
-                if m.code == 0 {
-                    // ок
                 }
             }
             _ => {}
@@ -85,12 +44,14 @@ pub fn validate(program: &[Statement]) -> Vec<ValidationMessage> {
 mod tests {
     use super::*;
     use crate::domain::*;
+    use crate::shared::Severity;
 
     #[test]
     fn test_validate_empty_program() {
         let msgs = validate(&[]);
         assert_eq!(msgs.len(), 1);
         assert_eq!(msgs[0].severity, Severity::Error);
+        assert_eq!(msgs[0].line, 0);
     }
 
     #[test]
@@ -102,6 +63,23 @@ mod tests {
         let msgs = validate(&program);
         assert_eq!(msgs.len(), 1);
         assert!(msgs[0].message.contains("X"));
+        // Первая строка — line=1
+        assert_eq!(msgs[0].line, 1);
+    }
+
+    #[test]
+    fn test_validate_axis_without_value_on_line_3() {
+        let program = vec![
+            Statement::NewLine,
+            Statement::NewLine,
+            Statement::Axis(AxisStatement {
+                axis: "Y".to_string(),
+                value: None,
+            }),
+        ];
+        let msgs = validate(&program);
+        assert_eq!(msgs.len(), 1);
+        assert_eq!(msgs[0].line, 3);
     }
 
     #[test]

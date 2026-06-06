@@ -15,44 +15,52 @@ impl fmt::Display for ParseError {
     }
 }
 
-/// Результат валидации AST
-#[derive(Debug, Clone)]
-pub struct ValidationResult {
-    pub errors: Vec<ValidationError>,
-    pub warnings: Vec<ValidationError>,
+/// Степень серьёзности ошибки валидации
+#[derive(Debug, Clone, PartialEq)]
+pub enum Severity {
+    /// Критическая ошибка — форматирование блокируется
+    Error,
+    /// Предупреждение — форматирование продолжается
+    Warning,
 }
 
-impl ValidationResult {
-    pub fn new() -> Self {
-        ValidationResult {
-            errors: Vec::new(),
-            warnings: Vec::new(),
+/// Результат проверки одного оператора валидатором
+#[derive(Debug, Clone, PartialEq)]
+pub struct ValidationMessage {
+    pub severity: Severity,
+    pub message: String,
+    /// Номер строки в исходном файле (1-based). 0 — если строка неизвестна.
+    pub line: usize,
+}
+
+impl ValidationMessage {
+    pub fn error(line: usize, message: impl Into<String>) -> Self {
+        ValidationMessage {
+            severity: Severity::Error,
+            message: message.into(),
+            line,
         }
     }
 
-    /// Есть ли критические ошибки (блокируют форматирование)
-    pub fn has_errors(&self) -> bool {
-        !self.errors.is_empty()
-    }
-
-    /// Есть ли предупреждения
-    pub fn has_warnings(&self) -> bool {
-        !self.warnings.is_empty()
+    pub fn warning(line: usize, message: impl Into<String>) -> Self {
+        ValidationMessage {
+            severity: Severity::Warning,
+            message: message.into(),
+            line,
+        }
     }
 }
 
-/// Ошибка валидации G-кода
-#[derive(Debug, Clone)]
-pub struct ValidationError {
-    pub message: String,
-    pub position: Option<usize>,
-}
-
-impl fmt::Display for ValidationError {
+impl fmt::Display for ValidationMessage {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match &self.position {
-            Some(pos) => write!(f, "at {}: {}", pos, self.message),
-            None => write!(f, "{}", self.message),
+        let level = match self.severity {
+            Severity::Error => "ОШИБКА",
+            Severity::Warning => "ПРЕДУПРЕЖДЕНИЕ",
+        };
+        if self.line > 0 {
+            write!(f, "{} [строка {}]: {}", level, self.line, self.message)
+        } else {
+            write!(f, "{}: {}", level, self.message)
         }
     }
 }

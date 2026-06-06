@@ -260,6 +260,18 @@ impl Lexer {
     }
 }
 
+/// Токен с информацией о позиции в исходном тексте
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpannedToken {
+    pub token: Token,
+    /// Начальная позиция в исходной строке (в символах UTF-8)
+    pub start: usize,
+    /// Конечная позиция (эксклюзивная)
+    pub end: usize,
+    /// Номер строки (1-based)
+    pub line: usize,
+}
+
 /// Вспомогательная функция: собирает все токены из строки в вектор
 pub fn tokenize(input: &str) -> Vec<Token> {
     let mut lexer = Lexer::new(input.to_string());
@@ -272,6 +284,37 @@ pub fn tokenize(input: &str) -> Vec<Token> {
         tokens.push(token);
     }
     tokens
+}
+
+/// Возвращает токены с информацией о позиции в исходном тексте.
+/// Нужно для подсветки ошибок в GUI.
+pub fn tokenize_with_positions(input: &str) -> Vec<SpannedToken> {
+    let mut lexer = Lexer::new(input.to_string());
+    let mut result = Vec::new();
+    let mut line: usize = 1;
+    loop {
+        let start = lexer.position;
+        let token = lexer.next_token();
+        if token == Token::Eof {
+            break;
+        }
+        let end = lexer.position;
+        result.push(SpannedToken {
+            token,
+            start,
+            end,
+            line,
+        });
+        // Если токен — NewLine, увеличиваем номер строки для следующих токенов
+        if result
+            .last()
+            .map(|t| t.token == Token::NewLine)
+            .unwrap_or(false)
+        {
+            line += 1;
+        }
+    }
+    result
 }
 
 #[cfg(test)]

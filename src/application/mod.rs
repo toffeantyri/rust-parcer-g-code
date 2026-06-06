@@ -8,4 +8,4 @@ mod validator;
 
 pub use formatter::{FormatConfig, Formatter};
 pub use parser::Parser;
-pub use validator::{validate, Severity, ValidationMessage};
+pub use validator::validate;

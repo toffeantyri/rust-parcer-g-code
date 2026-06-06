@@ -5,8 +5,9 @@
 use std::fs;
 use std::process;
 
-use crate::application::{validate, FormatConfig, Formatter, Parser, Severity};
+use crate::application::{validate, FormatConfig, Formatter, Parser};
 use crate::infrastructure::lexer::tokenize;
+use crate::shared::Severity;
 
 /// Запускает полный цикл: чтение файла -> лексинг -> парсинг -> валидация -> форматирование -> вывод
 pub fn run(input_path: &str) {
@@ -43,11 +44,7 @@ pub fn run(input_path: &str) {
         .any(|m| m.severity == Severity::Error);
 
     for msg in &validation_messages {
-        let level = match msg.severity {
-            Severity::Error => "ОШИБКА",
-            Severity::Warning => "ПРЕДУПРЕЖДЕНИЕ",
-        };
-        eprintln!("{} [{}]: {}", level, msg.location, msg.message);
+        eprintln!("{}", msg);
     }
 
     // Если есть критические ошибки — не выводим результат

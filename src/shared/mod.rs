@@ -2,4 +2,4 @@
 
 mod error;
 
-pub use error::{ParseError, ValidationError, ValidationResult};
+pub use error::{ParseError, Severity, ValidationMessage};
