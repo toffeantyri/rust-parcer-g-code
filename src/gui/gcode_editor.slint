@@ -1,18 +1,49 @@
-import { Button, VerticalBox } from "std-widgets.slint";
+import { Button, LineEdit, ScrollView, TextEdit } from "std-widgets.slint";
 
 export component GCodeEditor inherits Window {
     title: "G-Code Editor";
-    preferred-width: 800px;
-    preferred-height: 600px;
+    preferred-width: 900px;
+    preferred-height: 700px;
+
+    in-out property <string> file_path;
+    in-out property <string> code_content;
+
+    callback open_file_dialog();
 
     VerticalLayout {
-        padding: 16px;
+        padding: 8px;
         spacing: 8px;
 
+        // Верхняя панель: путь и кнопка открытия
+        HorizontalLayout {
+            spacing: 8px;
+            LineEdit {
+                text <=> file_path;
+                placeholder-text: "Выберите файл G-кода...";
+                horizontal-stretch: 1;
+            }
+            Button {
+                text: "Открыть файл";
+                clicked => { open_file_dialog(); }
+            }
+        }
+
+        // Редактор кода
         Text {
-            text: "Добро пожаловать в G-Code Editor!";
-            font-size: 24px;
-            horizontal-alignment: center;
+            text: "Исходный код:";
+            font-size: 14px;
+            font-weight: 700;
+        }
+        ScrollView {
+            horizontal-stretch: 1;
+            vertical-stretch: 1;
+            TextEdit {
+                text <=> code_content;
+                wrap: word-wrap;
+                font-family: "Courier New";
+                font-size: 13px;
+                read-only: false;
+            }
         }
     }
 }
