@@ -17,6 +17,8 @@ name = "gcode_editor"
 path = "src/bin/gui_main.rs"
 
 [dependencies]
+anyhow = "1.0"
+thiserror = "2.0"
 slint = { version = "1.8", default-features = false, features = ["backend-winit", "renderer-software", "compat-1-2"] }
 rfd = "0.15"
 

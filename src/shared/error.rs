@@ -1,18 +1,14 @@
 //! Общие типы ошибок для всех слоёв приложения
 
 use std::fmt;
+use thiserror::Error;
 
 /// Ошибка разбора G-кода
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Error)]
+#[error("ParseError в позиции {position}: {message}")]
 pub struct ParseError {
     pub message: String,
     pub position: usize,
-}
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "ParseError at {}: {}", self.position, self.message)
-    }
 }
 
 /// Степень серьёзности ошибки валидации
@@ -25,7 +21,7 @@ pub enum Severity {
 }
 
 /// Результат проверки одного оператора валидатором
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Error)]
 pub struct ValidationMessage {
     pub severity: Severity,
     pub message: String,

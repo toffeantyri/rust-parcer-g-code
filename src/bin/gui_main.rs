@@ -135,32 +135,15 @@ fn main() {
         let input = ui.get_code_content().to_string();
         ui.set_status_text("Форматирование...".into());
 
-        let tokens = code_parser::infrastructure::lexer::tokenize(&input);
-        let mut parser = code_parser::application::Parser::new(tokens);
-        let program = match parser.parse_program() {
-            Ok(p) => p,
-            Err(e) => {
-                ui.set_status_text(format!("Ошибка парсинга: {}", e).into());
-                return;
+        match format_code(&input) {
+            Ok(formatted) => {
+                ui.set_code_content(formatted.into());
+                ui.set_status_text("Форматирование завершено".into());
             }
-        };
-
-        let errors = code_parser::application::validate(&program);
-        if errors
-            .iter()
-            .any(|e| e.severity == code_parser::shared::Severity::Error)
-        {
-            ui.set_status_text(
-                format!("Найдено {} ошибок. Форматирование отменено.", errors.len()).into(),
-            );
-            return;
+            Err(e) => {
+                ui.set_status_text(format!("Ошибка: {:#}", e).into());
+            }
         }
-
-        let fmt = code_parser::application::Formatter::new(
-            code_parser::application::FormatConfig::default(),
-        );
-        ui.set_code_content(fmt.format_program(&program).into());
-        ui.set_status_text("Форматирование завершено".into());
     });
 
     // --- Проверить ошибки ---
@@ -169,29 +152,25 @@ fn main() {
         let ui = ui_handle.unwrap();
         let input = ui.get_code_content().to_string();
 
-        let tokens = code_parser::infrastructure::lexer::tokenize(&input);
-        let mut parser = code_parser::application::Parser::new(tokens);
-        let program = match parser.parse_program() {
-            Ok(p) => p,
-            Err(e) => {
-                ui.set_status_text(format!("Ошибка парсинга: {}", e).into());
-                return;
+        match validate_code(&input) {
+            Ok(msgs) => {
+                if msgs.is_empty() {
+                    ui.set_status_text("Ошибок не найдено. Код корректен.".into());
+                } else {
+                    let has_err = msgs
+                        .iter()
+                        .any(|e| e.severity == code_parser::shared::Severity::Error);
+                    let level = if has_err {
+                        "ошибок"
+                    } else {
+                        "предупреждений"
+                    };
+                    ui.set_status_text(format!("Найдено {} {}.", msgs.len(), level).into());
+                }
             }
-        };
-
-        let errors = code_parser::application::validate(&program);
-        if errors.is_empty() {
-            ui.set_status_text("Ошибок не найдено. Код корректен.".into());
-        } else {
-            let has_err = errors
-                .iter()
-                .any(|e| e.severity == code_parser::shared::Severity::Error);
-            let level = if has_err {
-                "ошибок"
-            } else {
-                "предупреждений"
-            };
-            ui.set_status_text(format!("Найдено {} {}.", errors.len(), level).into());
+            Err(e) => {
+                ui.set_status_text(format!("Ошибка: {:#}", e).into());
+            }
         }
     });
 
@@ -212,4 +191,38 @@ fn main() {
     });
 
     ui.run().unwrap();
+}
+
+/// Форматирует G-код: лексинг -> парсинг -> валидация -> форматирование.
+/// Возвращает отформатированную строку или ошибку anyhow.
+fn format_code(input: &str) -> anyhow::Result<String> {
+    use anyhow::Context;
+
+    let tokens = code_parser::infrastructure::lexer::tokenize(input);
+    let mut parser = code_parser::application::Parser::new(tokens);
+    let program = parser.parse_program().context("Ошибка парсинга G-кода")?;
+
+    let errors = code_parser::application::validate(&program);
+    if errors
+        .iter()
+        .any(|e| e.severity == code_parser::shared::Severity::Error)
+    {
+        anyhow::bail!("Найдено {} ошибок. Форматирование отменено.", errors.len());
+    }
+
+    let fmt =
+        code_parser::application::Formatter::new(code_parser::application::FormatConfig::default());
+    Ok(fmt.format_program(&program))
+}
+
+/// Проверяет G-код на ошибки: лексинг -> парсинг -> валидация.
+/// Возвращает список сообщений валидации или ошибку anyhow.
+fn validate_code(input: &str) -> anyhow::Result<Vec<code_parser::shared::ValidationMessage>> {
+    use anyhow::Context;
+
+    let tokens = code_parser::infrastructure::lexer::tokenize(input);
+    let mut parser = code_parser::application::Parser::new(tokens);
+    let program = parser.parse_program().context("Ошибка парсинга G-кода")?;
+
+    Ok(code_parser::application::validate(&program))
 }
