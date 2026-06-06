@@ -1,34 +1,21 @@
-//use code_parser::{lexer, parser, formatter};
+//! Точка входа CLI для парсера и форматтера G-кода
+//!
+//! Использует interfaces::run для полного цикла обработки.
+
+use std::env;
 
 fn main() {
-    println!("🚀 Запуск парсера и форматтера...");
+    // Чтение пути к файлу из аргументов командной строки
+    let args: Vec<String> = env::args().collect();
+    let input_path = if args.len() > 1 {
+        &args[1]
+    } else {
+        "input_code.txt"
+    };
 
-    let input = "пример кода для разбора";
+    println!("🚀 Запуск парсера и форматтера G-кода...");
+    println!("Файл: {}\n", input_path);
 
-    // Пока используем заглушки — нужно убедиться, что модули экспортируют эти функции
-    let tokens = lexer::lex(input);
-    let ast = parser::parse(&tokens);
-    let formatted = formatter::format(&ast);
-
-    println!("Отформатированный код: {}", formatted);
-}
-
-// Временные заглушки, если в библиотеке нет реализации
-// Уберите это, когда реализуете реальные модули
-mod lexer {
-    pub fn lex(input: &str) -> Vec<String> {
-        vec![format!("LEXED({})", input)]
-    }
-}
-
-mod parser {
-    pub fn parse(tokens: &[String]) -> String {
-        format!("AST({:?})", tokens)
-    }
-}
-
-mod formatter {
-    pub fn format(ast: &str) -> String {
-        format!("Formatted: {}", ast)
-    }
+    // Запуск полного цикла через интерфейсный слой
+    code_parser::interfaces::run(input_path);
 }
