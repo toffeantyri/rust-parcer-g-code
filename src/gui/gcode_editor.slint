@@ -31,6 +31,7 @@ export component GCodeEditor inherits Window {
     in-out property <string> file_path;
     in-out property <string> code_content;
     in-out property <string> status_text;
+    in-out property <bool> edit_mode: false;
 
     in-out property <bool> file_menu_open;
     in-out property <bool> edit_menu_open;
@@ -48,10 +49,12 @@ export component GCodeEditor inherits Window {
     callback menu_file_exit();
     callback menu_edit_format();
     callback menu_edit_validate();
+    callback menu_edit_toggle_mode();
     callback menu_help_about();
     callback menu_help_shortcuts();
 
     VerticalLayout {
+
         Rectangle {
             background: #f5f5f5;
             min-height: 30px;
@@ -82,8 +85,31 @@ export component GCodeEditor inherits Window {
                 HorizontalLayout { horizontal-stretch: 1; }
                 Text { text: file_path; color: #999; font-size: 12px; vertical-alignment: center; }
             }
+        }
 
-            if (file_menu_open) : Rectangle {
+        sa := TextEdit {
+                //text: root.code_content;
+                //edited(str) <=> { root.code_content = str; }
+                text <=> root.code_content;
+                font-family: "Consolas";
+                font-size: 13px;
+                read-only: false;
+                horizontal-stretch: 1;
+                vertical-stretch: 1;
+        }
+
+        Rectangle {
+            background: #2c3e50; min-height: 28px;
+            HorizontalLayout {
+                padding-top: 4px; padding-bottom: 4px; padding-left: 8px; padding-right: 8px;
+                Text { text: status_text; font-size: 12px; color: #ecf0f1; horizontal-stretch: 1; vertical-alignment: center; }
+                Text { text: "v0.1"; font-size: 11px; color: #95a5a6; vertical-alignment: center; }
+            }
+        }
+
+    }
+
+    if (file_menu_open) : Rectangle {
                 border-radius: 4px; width: 200px; x: 4px; y: 30px;
                 VerticalLayout {
                     spacing: 0; padding: 4px;
@@ -97,7 +123,7 @@ export component GCodeEditor inherits Window {
             }
 
             if (edit_menu_open) : Rectangle {
-                border-radius: 4px; width: 150px; x: 68px; y: 30px;
+                border-radius: 4px; width: 180px; x: 68px; y: 30px;
                 VerticalLayout {
                     spacing: 0; padding: 4px;
                     PopupItem { item_text: "Format";       shortcut: "F5"; item_clicked => { edit_menu_open = false; menu_edit_format(); } }
@@ -114,23 +140,4 @@ export component GCodeEditor inherits Window {
                     PopupItem { item_text: "About";        shortcut: "";    item_clicked => { help_menu_open = false; menu_help_about(); } }
                 }
             }
-        }
-
-        ScrollView {
-            horizontal-stretch: 1; vertical-stretch: 1;
-            TextEdit {
-                text <=> code_content;
-                wrap: no-wrap; font-family: "Courier New"; font-size: 13px; read-only: false;
-            }
-        }
-
-        Rectangle {
-            background: #2c3e50; min-height: 28px;
-            HorizontalLayout {
-                padding-top: 4px; padding-bottom: 4px; padding-left: 8px; padding-right: 8px;
-                Text { text: status_text; font-size: 12px; color: #ecf0f1; horizontal-stretch: 1; vertical-alignment: center; }
-                Text { text: "v0.1"; font-size: 11px; color: #95a5a6; vertical-alignment: center; }
-            }
-        }
-    }
 }

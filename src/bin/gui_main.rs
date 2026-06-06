@@ -128,6 +128,20 @@ fn main() {
         std::process::exit(0);
     });
 
+    // --- Редактировать (переключение режима) ---
+    let ui_handle = ui.as_weak();
+    ui.on_menu_edit_toggle_mode(move || {
+        let ui = ui_handle.unwrap();
+        let is_edit = ui.get_edit_mode();
+        if is_edit {
+            ui.set_edit_mode(false);
+            ui.set_status_text("Режим просмотра".into());
+        } else {
+            ui.set_edit_mode(true);
+            ui.set_status_text("Режим редактирования. Сохраните изменения.".into());
+        }
+    });
+
     // --- Форматировать ---
     let ui_handle = ui.as_weak();
     ui.on_menu_edit_format(move || {
