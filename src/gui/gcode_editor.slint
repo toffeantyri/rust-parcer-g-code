@@ -1,0 +1,18 @@
+import { Button, VerticalBox } from "std-widgets.slint";
+
+export component GCodeEditor inherits Window {
+    title: "G-Code Editor";
+    preferred-width: 800px;
+    preferred-height: 600px;
+
+    VerticalLayout {
+        padding: 16px;
+        spacing: 8px;
+
+        Text {
+            text: "Добро пожаловать в G-Code Editor!";
+            font-size: 24px;
+            horizontal-alignment: center;
+        }
+    }
+}
