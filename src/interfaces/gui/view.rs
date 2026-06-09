@@ -58,6 +58,11 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool) -> Vec<Intent> {
                     intents.push(Intent::Validate);
                     ui.close_menu();
                 }
+                ui.separator();
+                if ui.button("Format Settings...").clicked() {
+                    intents.push(Intent::ToggleSettings);
+                    ui.close_menu();
+                }
             });
             ui.menu_button("Help", |ui| {
                 if ui.button("Shortcuts").clicked() {
@@ -109,7 +114,6 @@ pub fn view_statusbar(model: &Model, ctx: &egui::Context) {
         ui.horizontal(|ui| {
             let mut status = model.status.clone();
             if model.is_busy {
-                // Анимированный индикатор: добавляем точки в зависимости от времени
                 let dots = ((ctx.input(|i| i.time) * 4.0) as usize) % 4;
                 status.push_str(" ");
                 for i in 0..3 {
@@ -132,7 +136,52 @@ pub fn view_statusbar(model: &Model, ctx: &egui::Context) {
     });
 }
 
-/// Отрисовывает редактор кода. Требует `&mut model.content`.
+/// Отрисовывает окно настроек форматирования.
+pub fn view_settings(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
+    let mut intents = Vec::new();
+    let mut open_copy = model.settings_open;
+
+    if !open_copy {
+        return intents;
+    }
+
+    egui::Window::new("Format Settings")
+        .open(&mut open_copy)
+        .resizable(false)
+        .default_size([320.0, 200.0])
+        .show(ctx, |ui| {
+            ui.label("Renumber step:");
+            ui.horizontal(|ui| {
+                for &step in &[1u32, 10, 100] {
+                    let selected = model.format_settings.renumber_step == step;
+                    if ui.selectable_label(selected, format!("{}", step)).clicked() {
+                        intents.push(Intent::SetRenumberStep(step));
+                    }
+                }
+            });
+            ui.add_space(8.0);
+            ui.label("Examples:");
+            let step = model.format_settings.renumber_step;
+            ui.label(format!("N{} N{} N{} ...", step, step * 2, step * 3));
+            ui.add_space(12.0);
+            let mut skip = model.format_settings.skip_empty_lines;
+            if ui
+                .checkbox(&mut skip, "Skip empty lines when renumbering")
+                .changed()
+            {
+                intents.push(Intent::SetSkipEmptyLines(skip));
+            }
+        });
+
+    // Если окно было закрыто через крестик — синхронизируем
+    if !open_copy {
+        intents.push(Intent::ToggleSettings);
+    }
+
+    intents
+}
+
+/// Отрисовывает редактор кода.
 pub fn view_editor(model: &mut Model, ctx: &egui::Context) {
     egui::CentralPanel::default().show(ctx, |ui| {
         egui::ScrollArea::vertical()

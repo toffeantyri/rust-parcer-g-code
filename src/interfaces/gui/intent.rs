@@ -10,4 +10,10 @@ pub enum Intent {
     Exit,
     Format,
     Validate,
+    /// Открыть / закрыть окно настроек форматирования
+    ToggleSettings,
+    /// Установить шаг перенумерации
+    SetRenumberStep(u32),
+    /// Установить флаг пропуска пустых строк
+    SetSkipEmptyLines(bool),
 }

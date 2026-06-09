@@ -12,12 +12,12 @@ pub struct GCodeApp {
 
 impl Default for GCodeApp {
     fn default() -> Self {
-        Self {
-            model: Model {
-                status: "Готов к работе. Откройте файл G-кода.".to_string(),
-                ..Default::default()
-            },
-        }
+        let mut model = Model {
+            status: "Готов к работе. Откройте файл G-кода.".to_string(),
+            ..Default::default()
+        };
+        model.load_settings();
+        Self { model }
     }
 }
 
@@ -31,6 +31,12 @@ impl eframe::App for GCodeApp {
 
         // 2. Intent → Update: применяем каждое намерение к модели
         for intent in &intents {
+            self.model.apply(intent);
+        }
+
+        // 2b. Settings view (отдельный проход, т.к. Window может вернуть intents)
+        let settings_intents = view::view_settings(&self.model, ctx);
+        for intent in &settings_intents {
             self.model.apply(intent);
         }
 

@@ -23,7 +23,7 @@ impl Model {
                     self.status = "Редактор пуст. Нечего форматировать.".to_string();
                 } else {
                     self.status = "Форматирование...".to_string();
-                    match format_code(&self.content) {
+                    match format_code_with_settings(&self.content, &self.format_settings) {
                         Ok(formatted) => {
                             self.content = formatted;
                             self.status = "Форматирование завершено".to_string();
@@ -53,6 +53,17 @@ impl Model {
                         Err(e) => self.status = format!("Ошибка: {}", e),
                     }
                 }
+            }
+            Intent::ToggleSettings => {
+                self.settings_open = !self.settings_open;
+            }
+            Intent::SetRenumberStep(step) => {
+                self.format_settings.renumber_step = *step;
+                self.save_settings();
+            }
+            Intent::SetSkipEmptyLines(skip) => {
+                self.format_settings.skip_empty_lines = *skip;
+                self.save_settings();
             }
         }
     }
@@ -129,9 +140,50 @@ impl Model {
     }
 }
 
+// --- Сохранение и загрузка настроек ---
+
+/// Путь к файлу настроек
+fn settings_path() -> std::path::PathBuf {
+    let mut path = if let Some(home) = std::env::var("HOME").ok() {
+        std::path::PathBuf::from(home)
+    } else {
+        std::path::PathBuf::from(".")
+    };
+    path.push(".config");
+    path.push("gcode-editor");
+    path.push("settings.json");
+    path
+}
+
+impl Model {
+    /// Сохраняет настройки в файл
+    pub fn save_settings(&self) {
+        let path = settings_path();
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        if let Ok(json) = serde_json::to_string_pretty(&self.format_settings) {
+            let _ = std::fs::write(&path, json);
+        }
+    }
+
+    /// Загружает настройки из файла
+    pub fn load_settings(&mut self) {
+        let path = settings_path();
+        if let Ok(json) = std::fs::read_to_string(&path) {
+            if let Ok(settings) = serde_json::from_str::<super::model::FormatSettings>(&json) {
+                self.format_settings = settings;
+            }
+        }
+    }
+}
+
 // --- Вспомогательные функции пайплайна ---
 
-fn format_code(input: &str) -> anyhow::Result<String> {
+fn format_code_with_settings(
+    input: &str,
+    settings: &super::model::FormatSettings,
+) -> anyhow::Result<String> {
     use anyhow::Context;
     let tokens = crate::infrastructure::lexer::tokenize(input);
     let mut parser = crate::application::Parser::new(tokens);
@@ -140,7 +192,16 @@ fn format_code(input: &str) -> anyhow::Result<String> {
     if errors.iter().any(|e| e.severity == Severity::Error) {
         anyhow::bail!("Найдено {} ошибок. Форматирование отменено.", errors.len());
     }
-    let fmt = crate::application::Formatter::new(crate::application::FormatConfig::default());
+
+    let config = crate::application::FormatConfig {
+        uppercase_codes: true,
+        decimal_places: 5,
+        renumber_step: settings.renumber_step,
+        skip_empty_lines: settings.skip_empty_lines,
+        ..Default::default()
+    };
+
+    let fmt = crate::application::Formatter::new(config);
     Ok(fmt.format_program(&program))
 }
 
