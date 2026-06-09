@@ -73,9 +73,7 @@ impl Model {
             return;
         }
         self.is_busy = true;
-        let file = rfd::FileDialog::new()
-            .add_filter("G-Code", &["txt", "nc", "cnc", "gcode", "ngc"])
-            .pick_file();
+        let file = rfd::FileDialog::new().pick_file();
         self.is_busy = false;
         if let Some(path) = file {
             let path_str = path.to_string_lossy().to_string();
@@ -123,9 +121,7 @@ impl Model {
             return;
         }
         self.is_busy = true;
-        let file = rfd::FileDialog::new()
-            .add_filter("G-Code", &["nc", "cnc", "txt", "gcode"])
-            .save_file();
+        let file = rfd::FileDialog::new().save_file();
         self.is_busy = false;
         if let Some(path) = file {
             let path_str = path.to_string_lossy().to_string();

@@ -6,7 +6,7 @@ use super::intent::Intent;
 use super::model::Model;
 
 /// Собирает намерения от UI: меню + панель инструментов.
-pub fn collect_intents(ctx: &egui::Context, is_busy: bool) -> Vec<Intent> {
+pub fn collect_intents(ctx: &egui::Context, is_busy: bool, file_path: &str) -> Vec<Intent> {
     let mut intents = Vec::new();
 
     egui::TopBottomPanel::top("menu_panel").show(ctx, |ui| {
@@ -102,6 +102,13 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool) -> Vec<Intent> {
             {
                 intents.push(Intent::Validate);
             }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.label(
+                    egui::RichText::new(file_path)
+                        .size(12.0)
+                        .color(egui::Color32::GRAY),
+                );
+            });
         });
     });
 

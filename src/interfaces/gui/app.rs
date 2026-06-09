@@ -27,7 +27,7 @@ impl eframe::App for GCodeApp {
         let is_busy = self.model.is_busy;
 
         // 1. View → Intent: собираем намерения от UI
-        let intents = view::collect_intents(ctx, is_busy);
+        let intents = view::collect_intents(ctx, is_busy, &self.model.file_path);
 
         // 2. Intent → Update: применяем каждое намерение к модели
         for intent in &intents {
