@@ -83,7 +83,6 @@ export component GCodeEditor inherits Window {
                     TouchArea { width: 100%; height: 100%; clicked => { menu_help_toggle(); } }
                 }
 
-                HorizontalLayout { horizontal-stretch: 1; }
                 Text { text: file_path; color: #999; font-size: 12px; vertical-alignment: center; }
             }
         }
@@ -113,10 +112,10 @@ export component GCodeEditor inherits Window {
                 border-radius: 4px; width: 200px; x: 4px; y: 30px;
                 VerticalLayout {
                     spacing: 0; padding: 4px;
-                    PopupItem { item_text: "Open...";      shortcut: "Ctrl+O"; item_clicked => { file_menu_open = false; menu_file_open(); } }
-                    PopupItem { item_text: "Save";         shortcut: "Ctrl+S"; item_clicked => { file_menu_open = false; menu_file_save(); } }
-                    PopupItem { item_text: "Save as...";   shortcut: "";       item_clicked => { file_menu_open = false; menu_file_save_as(); } }
-                    PopupItem { item_text: "Close";        shortcut: "";       item_clicked => { file_menu_open = false; menu_file_close(); } }
+                    PopupItem { item_text: "Open...";      shortcut: "Ctrl+O"; item_clicked => { file_menu_open = false; menu_file_open(); close_menus(); } }
+                    PopupItem { item_text: "Save";         shortcut: "Ctrl+S"; item_clicked => { file_menu_open = false; menu_file_save();  close_menus();} }
+                    PopupItem { item_text: "Save as...";   shortcut: "";       item_clicked => { file_menu_open = false; menu_file_save_as();  close_menus();} }
+                    PopupItem { item_text: "Close";        shortcut: "";       item_clicked => { file_menu_open = false; menu_file_close();  close_menus();} }
                     Rectangle { min-height: 1px; max-height: 1px; background: #ddd; }
                     PopupItem { item_text: "Exit";         shortcut: "Ctrl+Q"; item_clicked => { file_menu_open = false; menu_file_exit(); } }
                 }
@@ -126,8 +125,8 @@ export component GCodeEditor inherits Window {
                 border-radius: 4px; width: 180px; x: 68px; y: 30px;
                 VerticalLayout {
                     spacing: 0; padding: 4px;
-                    PopupItem { item_text: "Format";       shortcut: "F5"; item_clicked => { edit_menu_open = false; menu_edit_format(); } }
-                    PopupItem { item_text: "Validate";     shortcut: "F6"; item_clicked => { edit_menu_open = false; menu_edit_validate(); } }
+                    PopupItem { item_text: "Format";       shortcut: "F5"; item_clicked => { edit_menu_open = false; menu_edit_format(); close_menus(); } }
+                    PopupItem { item_text: "Validate";     shortcut: "F6"; item_clicked => { edit_menu_open = false; menu_edit_validate(); close_menus(); } }
                 }
             }
 
