@@ -88,7 +88,7 @@ export component GCodeEditor inherits Window {
         }
 
         sa := TextEdit {
-                text: root.code_content;
+                text <=> root.code_content;
                 font-family: "monospace";
                 font-size: 13px;
                 read-only: false;
