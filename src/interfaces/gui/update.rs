@@ -47,7 +47,18 @@ impl Model {
                                 } else {
                                     "предупреждений"
                                 };
-                                self.status = format!("Найдено {} {}", msgs.len(), level);
+                                // Показываем первую ошибку с номером строки
+                                if let Some(first) = msgs.first() {
+                                    self.status = format!(
+                                        "Найдено {} {}. Первая: {} [строка {}]",
+                                        msgs.len(),
+                                        level,
+                                        first.message,
+                                        first.line
+                                    );
+                                } else {
+                                    self.status = format!("Найдено {} {}", msgs.len(), level);
+                                }
                             }
                         }
                         Err(e) => self.status = format!("Ошибка: {}", e),
