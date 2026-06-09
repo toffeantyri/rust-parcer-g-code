@@ -1,5 +1,6 @@
-//! Интерфейсный слой: CLI, API, веб-обработчики
+//! Интерфейсный слой: CLI, GUI
 
 mod cli;
+pub mod gui;
 
 pub use cli::run;
