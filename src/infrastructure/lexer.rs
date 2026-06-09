@@ -260,18 +260,6 @@ impl Lexer {
     }
 }
 
-/// Токен с информацией о позиции в исходном тексте
-#[derive(Debug, Clone, PartialEq)]
-pub struct SpannedToken {
-    pub token: Token,
-    /// Начальная позиция в исходной строке (в символах UTF-8)
-    pub start: usize,
-    /// Конечная позиция (эксклюзивная)
-    pub end: usize,
-    /// Номер строки (1-based)
-    pub line: usize,
-}
-
 /// Вспомогательная функция: собирает все токены из строки в вектор
 pub fn tokenize(input: &str) -> Vec<Token> {
     let mut lexer = Lexer::new(input.to_string());
@@ -284,37 +272,6 @@ pub fn tokenize(input: &str) -> Vec<Token> {
         tokens.push(token);
     }
     tokens
-}
-
-/// Возвращает токены с информацией о позиции в исходном тексте.
-/// Нужно для подсветки ошибок в GUI.
-pub fn tokenize_with_positions(input: &str) -> Vec<SpannedToken> {
-    let mut lexer = Lexer::new(input.to_string());
-    let mut result = Vec::new();
-    let mut line: usize = 1;
-    loop {
-        let start = lexer.position;
-        let token = lexer.next_token();
-        if token == Token::Eof {
-            break;
-        }
-        let end = lexer.position;
-        result.push(SpannedToken {
-            token,
-            start,
-            end,
-            line,
-        });
-        // Если токен — NewLine, увеличиваем номер строки для следующих токенов
-        if result
-            .last()
-            .map(|t| t.token == Token::NewLine)
-            .unwrap_or(false)
-        {
-            line += 1;
-        }
-    }
-    result
 }
 
 #[cfg(test)]
@@ -361,18 +318,9 @@ mod tests {
     fn test_axis_expr() {
         let tokens = tokenize("Z=71.304 X=160+10 Y=3*5/2");
 
-        assert_eq!(
-            tokens[0],
-            Token::AxisExpr("Z".to_string(), "71.304".to_string())
-        );
-        assert_eq!(
-            tokens[1],
-            Token::AxisExpr("X".to_string(), "160+10".to_string())
-        );
-        assert_eq!(
-            tokens[2],
-            Token::AxisExpr("Y".to_string(), "3*5/2".to_string())
-        );
+        assert_eq!(tokens[0], Token::AxisExpr("Z".to_string(), "71.304".to_string()));
+        assert_eq!(tokens[1], Token::AxisExpr("X".to_string(), "160+10".to_string()));
+        assert_eq!(tokens[2], Token::AxisExpr("Y".to_string(), "3*5/2".to_string()));
     }
 
     #[test]
@@ -391,10 +339,7 @@ mod tests {
 
         assert_eq!(tokens[0], Token::GCode(0));
         // Всё в скобках — Word (скобочное выражение)
-        assert_eq!(
-            tokens[1],
-            Token::Word("(comment (nested) content)".to_string())
-        );
+        assert_eq!(tokens[1], Token::Word("(comment (nested) content)".to_string()));
         assert_eq!(tokens[2], Token::Axis("X".to_string(), Some(10.0)));
     }
 
@@ -406,10 +351,7 @@ mod tests {
         assert_eq!(tokens[0], Token::Word("MODECHECK(2)".to_string()));
         assert_eq!(tokens[1], Token::Word("TRANS".to_string()));
         assert_eq!(tokens[2], Token::Axis("Z".to_string(), Some(-8.0)));
-        assert_eq!(
-            tokens[3],
-            Token::Word("MATLCH(\"DISKD125\",0,1)".to_string())
-        );
+        assert_eq!(tokens[3], Token::Word("MATLCH(\"DISKD125\",0,1)".to_string()));
     }
 
     #[test]

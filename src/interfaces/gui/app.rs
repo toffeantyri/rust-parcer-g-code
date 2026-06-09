@@ -23,8 +23,11 @@ impl Default for GCodeApp {
 
 impl eframe::App for GCodeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Если приложение занято (диалог открыт) — блокируем кнопки
+        let is_busy = self.model.is_busy;
+
         // 1. View → Intent: собираем намерения от UI
-        let intents = view::collect_intents(ctx);
+        let intents = view::collect_intents(ctx, is_busy);
 
         // 2. Intent → Update: применяем каждое намерение к модели
         for intent in &intents {

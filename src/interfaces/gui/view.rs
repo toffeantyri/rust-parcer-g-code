@@ -6,21 +6,30 @@ use super::intent::Intent;
 use super::model::Model;
 
 /// Собирает намерения от UI: меню + панель инструментов.
-pub fn collect_intents(ctx: &egui::Context) -> Vec<Intent> {
+pub fn collect_intents(ctx: &egui::Context, is_busy: bool) -> Vec<Intent> {
     let mut intents = Vec::new();
 
     egui::TopBottomPanel::top("menu_panel").show(ctx, |ui| {
         egui::menu::bar(ui, |ui| {
             ui.menu_button("File", |ui| {
-                if ui.button("Open...").clicked() {
+                if ui
+                    .add_enabled(!is_busy, egui::Button::new("Open..."))
+                    .clicked()
+                {
                     intents.push(Intent::OpenFile);
                     ui.close_menu();
                 }
-                if ui.button("Save").clicked() {
+                if ui
+                    .add_enabled(!is_busy, egui::Button::new("Save"))
+                    .clicked()
+                {
                     intents.push(Intent::SaveFile);
                     ui.close_menu();
                 }
-                if ui.button("Save as...").clicked() {
+                if ui
+                    .add_enabled(!is_busy, egui::Button::new("Save as..."))
+                    .clicked()
+                {
                     intents.push(Intent::SaveAs);
                     ui.close_menu();
                 }
@@ -35,11 +44,17 @@ pub fn collect_intents(ctx: &egui::Context) -> Vec<Intent> {
                 }
             });
             ui.menu_button("Edit", |ui| {
-                if ui.button("Format (F5)").clicked() {
+                if ui
+                    .add_enabled(!is_busy, egui::Button::new("Format (F5)"))
+                    .clicked()
+                {
                     intents.push(Intent::Format);
                     ui.close_menu();
                 }
-                if ui.button("Validate (F6)").clicked() {
+                if ui
+                    .add_enabled(!is_busy, egui::Button::new("Validate (F6)"))
+                    .clicked()
+                {
                     intents.push(Intent::Validate);
                     ui.close_menu();
                 }
@@ -58,16 +73,28 @@ pub fn collect_intents(ctx: &egui::Context) -> Vec<Intent> {
 
     egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
         ui.horizontal(|ui| {
-            if ui.button("Open").clicked() {
+            if ui
+                .add_enabled(!is_busy, egui::Button::new("Open"))
+                .clicked()
+            {
                 intents.push(Intent::OpenFile);
             }
-            if ui.button("Save").clicked() {
+            if ui
+                .add_enabled(!is_busy, egui::Button::new("Save"))
+                .clicked()
+            {
                 intents.push(Intent::SaveFile);
             }
-            if ui.button("Format").clicked() {
+            if ui
+                .add_enabled(!is_busy, egui::Button::new("Format"))
+                .clicked()
+            {
                 intents.push(Intent::Format);
             }
-            if ui.button("Check").clicked() {
+            if ui
+                .add_enabled(!is_busy, egui::Button::new("Check"))
+                .clicked()
+            {
                 intents.push(Intent::Validate);
             }
         });
@@ -80,7 +107,20 @@ pub fn collect_intents(ctx: &egui::Context) -> Vec<Intent> {
 pub fn view_statusbar(model: &Model, ctx: &egui::Context) {
     egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
         ui.horizontal(|ui| {
-            ui.label(egui::RichText::new(&model.status).size(12.0));
+            let mut status = model.status.clone();
+            if model.is_busy {
+                // Анимированный индикатор: добавляем точки в зависимости от времени
+                let dots = ((ctx.input(|i| i.time) * 4.0) as usize) % 4;
+                status.push_str(" ");
+                for i in 0..3 {
+                    if i < dots {
+                        status.push('.');
+                    } else {
+                        status.push(' ');
+                    }
+                }
+            }
+            ui.label(egui::RichText::new(&status).size(12.0));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.label(
                     egui::RichText::new("v0.1")

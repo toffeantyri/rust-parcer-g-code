@@ -9,4 +9,6 @@ pub struct Model {
     pub file_path: String,
     /// Текст в строке состояния
     pub status: String,
+    /// Флаг: диалог открытия/сохранения уже показан
+    pub is_busy: bool,
 }
