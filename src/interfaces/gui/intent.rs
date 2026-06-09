@@ -16,4 +16,10 @@ pub enum Intent {
     SetRenumberStep(u32),
     /// Установить флаг пропуска пустых строк
     SetSkipEmptyLines(bool),
+    /// Подтверждение действия в диалоге
+    ConfirmSave,
+    /// Отказ от сохранения
+    DiscardAndContinue,
+    /// Отмена действия
+    CancelAction,
 }

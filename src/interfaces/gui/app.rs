@@ -34,9 +34,15 @@ impl eframe::App for GCodeApp {
             self.model.apply(intent);
         }
 
-        // 2b. Settings view (отдельный проход, т.к. Window может вернуть intents)
+        // 2b. Settings view
         let settings_intents = view::view_settings(&self.model, ctx);
         for intent in &settings_intents {
+            self.model.apply(intent);
+        }
+
+        // 2c. Exit dialog
+        let exit_intents = view::view_exit_dialog(&self.model, ctx);
+        for intent in &exit_intents {
             self.model.apply(intent);
         }
 

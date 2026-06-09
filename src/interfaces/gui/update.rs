@@ -9,15 +9,35 @@ impl Model {
     /// Вызывается из App::update() для каждого Intent.
     pub fn apply(&mut self, intent: &Intent) {
         match intent {
-            Intent::OpenFile => self.open_file_dialog(),
+            Intent::OpenFile => {
+                if self.modified && !self.file_path.is_empty() {
+                    self.show_exit_dialog = true;
+                    self.pending_action = Some(super::model::PendingAction::OpenNewFile);
+                } else {
+                    self.open_file_dialog();
+                }
+            }
             Intent::SaveFile => self.save_file(),
             Intent::SaveAs => self.save_as_dialog(),
             Intent::CloseFile => {
-                self.content.clear();
-                self.file_path.clear();
-                self.status = "Файл закрыт.".to_string();
+                if self.modified && !self.file_path.is_empty() {
+                    self.show_exit_dialog = true;
+                    self.pending_action = Some(super::model::PendingAction::CloseFile);
+                } else {
+                    self.content.clear();
+                    self.file_path.clear();
+                    self.modified = false;
+                    self.status = "Файл закрыт.".to_string();
+                }
             }
-            Intent::Exit => std::process::exit(0),
+            Intent::Exit => {
+                if self.modified && !self.file_path.is_empty() {
+                    self.show_exit_dialog = true;
+                    self.pending_action = Some(super::model::PendingAction::Exit);
+                } else {
+                    std::process::exit(0);
+                }
+            }
             Intent::Format => {
                 if self.content.is_empty() {
                     self.status = "Редактор пуст. Нечего форматировать.".to_string();
@@ -76,6 +96,45 @@ impl Model {
                 self.format_settings.skip_empty_lines = *skip;
                 self.save_settings();
             }
+            Intent::ConfirmSave => {
+                self.show_exit_dialog = false;
+                self.save_file();
+                let action = self.pending_action.take();
+                match action {
+                    Some(super::model::PendingAction::Exit) => std::process::exit(0),
+                    Some(super::model::PendingAction::CloseFile) => {
+                        self.content.clear();
+                        self.file_path.clear();
+                        self.modified = false;
+                        self.status = "Файл закрыт.".to_string();
+                    }
+                    Some(super::model::PendingAction::OpenNewFile) => {
+                        self.open_file_dialog();
+                    }
+                    None => {}
+                }
+            }
+            Intent::DiscardAndContinue => {
+                self.show_exit_dialog = false;
+                self.modified = false;
+                let action = self.pending_action.take();
+                match action {
+                    Some(super::model::PendingAction::Exit) => std::process::exit(0),
+                    Some(super::model::PendingAction::CloseFile) => {
+                        self.content.clear();
+                        self.file_path.clear();
+                        self.status = "Файл закрыт.".to_string();
+                    }
+                    Some(super::model::PendingAction::OpenNewFile) => {
+                        self.open_file_dialog();
+                    }
+                    None => {}
+                }
+            }
+            Intent::CancelAction => {
+                self.show_exit_dialog = false;
+                self.pending_action = None;
+            }
         }
     }
 
@@ -100,6 +159,7 @@ impl Model {
                     let lines = text.lines().count();
                     self.content = text;
                     self.file_path = path_str;
+                    self.modified = false;
                     self.status = format!(
                         "Загружен: {} ({} строк)",
                         std::path::Path::new(&self.file_path)
@@ -122,7 +182,10 @@ impl Model {
             return;
         }
         match std::fs::write(&self.file_path, &self.content) {
-            Ok(_) => self.status = "Сохранено".to_string(),
+            Ok(_) => {
+                self.modified = false;
+                self.status = "Сохранено".to_string();
+            }
             Err(e) => self.status = format!("Ошибка: {}", e),
         }
     }
@@ -139,6 +202,7 @@ impl Model {
             match std::fs::write(&path, &self.content) {
                 Ok(_) => {
                     self.file_path = path_str;
+                    self.modified = false;
                     self.status = "Сохранено".to_string();
                 }
                 Err(e) => self.status = format!("Ошибка: {}", e),

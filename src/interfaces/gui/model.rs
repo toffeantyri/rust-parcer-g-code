@@ -17,6 +17,20 @@ pub struct Model {
     pub settings_open: bool,
     /// Настройки форматирования
     pub format_settings: FormatSettings,
+    /// Был ли изменён текст после последнего сохранения/открытия
+    pub modified: bool,
+    /// Флаг: показать диалог подтверждения выхода
+    pub show_exit_dialog: bool,
+    /// Действие, которое нужно выполнить после подтверждения диалога
+    pub pending_action: Option<PendingAction>,
+}
+
+/// Действие, ожидающее подтверждения пользователя
+#[derive(Clone, PartialEq)]
+pub enum PendingAction {
+    Exit,
+    CloseFile,
+    OpenNewFile,
 }
 
 /// Настройки форматирования G-кода

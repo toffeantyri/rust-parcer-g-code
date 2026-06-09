@@ -188,8 +188,10 @@ pub fn view_settings(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
     intents
 }
 
-/// Отрисовывает редактор кода.
+/// Отрисовывает редактор кода и отслеживает изменения.
 pub fn view_editor(model: &mut Model, ctx: &egui::Context) {
+    let content_before = model.content.clone();
+
     egui::CentralPanel::default().show(ctx, |ui| {
         egui::ScrollArea::vertical()
             .id_salt("editor_scroll")
@@ -204,4 +206,46 @@ pub fn view_editor(model: &mut Model, ctx: &egui::Context) {
                 );
             });
     });
+
+    // Если текст изменился — помечаем как modified
+    if model.content != content_before {
+        model.modified = true;
+    }
+}
+
+/// Отрисовывает диалог подтверждения выхода/закрытия.
+pub fn view_exit_dialog(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
+    let mut intents = Vec::new();
+    if !model.show_exit_dialog {
+        return intents;
+    }
+
+    let mut is_open = true;
+    egui::Window::new("Save changes?")
+        .open(&mut is_open)
+        .resizable(false)
+        .collapsible(false)
+        .default_size([350.0, 120.0])
+        .show(ctx, |ui| {
+            ui.label("Do you want to save changes?");
+            ui.add_space(12.0);
+            ui.horizontal(|ui| {
+                if ui.button("Save").clicked() {
+                    intents.push(Intent::ConfirmSave);
+                }
+                if ui.button("Discard").clicked() {
+                    intents.push(Intent::DiscardAndContinue);
+                }
+                if ui.button("Cancel").clicked() {
+                    intents.push(Intent::CancelAction);
+                }
+            });
+        });
+
+    // Если закрыли крестиком — считаем отменой
+    if !is_open && model.show_exit_dialog {
+        intents.push(Intent::CancelAction);
+    }
+
+    intents
 }
