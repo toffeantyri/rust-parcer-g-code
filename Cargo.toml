@@ -19,8 +19,8 @@ path = "src/bin/gui_main.rs"
 [dependencies]
 anyhow = "1.0"
 thiserror = "2.0"
-slint = { version = "1.8", default-features = false, features = ["backend-winit", "renderer-winit-femtovg", "compat-1-2"] }
+slint = { version = "1.10", default-features = false, features = ["backend-winit", "renderer-winit-femtovg", "compat-1-2"] }
 rfd = "0.15"
 
 [build-dependencies]
-slint-build = "1.8"
+slint-build = "1.10"

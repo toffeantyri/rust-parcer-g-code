@@ -63,6 +63,7 @@ fn main() {
                     match content {
                         Some(text) => {
                             let lines = text.lines().count();
+                            ui.set_code_content(slint::SharedString::default());
                             ui.set_code_content(text.into());
                             ui.set_status_text(
                                 format!(
