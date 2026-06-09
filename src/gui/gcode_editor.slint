@@ -117,7 +117,7 @@ export component GCodeEditor inherits Window {
                     PopupItem { item_text: "Save as...";   shortcut: "";       item_clicked => { file_menu_open = false; menu_file_save_as();  close_menus();} }
                     PopupItem { item_text: "Close";        shortcut: "";       item_clicked => { file_menu_open = false; menu_file_close();  close_menus();} }
                     Rectangle { min-height: 1px; max-height: 1px; background: #ddd; }
-                    PopupItem { item_text: "Exit";         shortcut: "Ctrl+Q"; item_clicked => { file_menu_open = false; menu_file_exit(); } }
+                    PopupItem { item_text: "Exit";         shortcut: "Ctrl+Q"; item_clicked => { file_menu_open = false; menu_file_exit(); close_menus(); } }
                 }
             }
 
@@ -134,9 +134,9 @@ export component GCodeEditor inherits Window {
                 border-radius: 4px; width: 150px; x: 132px; y: 30px;
                 VerticalLayout {
                     spacing: 0; padding: 4px;
-                    PopupItem { item_text: "Shortcuts";    shortcut: "F1";  item_clicked => { help_menu_open = false; menu_help_shortcuts(); } }
+                    PopupItem { item_text: "Shortcuts";    shortcut: "F1";  item_clicked => { help_menu_open = false; menu_help_shortcuts(); close_menus(); } }
                     Rectangle { min-height: 1px; max-height: 1px; background: #ddd; }
-                    PopupItem { item_text: "About";        shortcut: "";    item_clicked => { help_menu_open = false; menu_help_about(); } }
+                    PopupItem { item_text: "About";        shortcut: "";    item_clicked => { help_menu_open = false; menu_help_about(); close_menus(); } }
                 }
             }
 }

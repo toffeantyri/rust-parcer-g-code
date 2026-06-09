@@ -34,7 +34,13 @@ fn main() {
         let was_open = ui.get_help_menu_open();
         ui.set_help_menu_open(!was_open);
     });
-    ui.on_close_menus(|| {});
+    let weak_ui = ui.as_weak();
+    ui.on_close_menus(move || {
+        let ui = weak_ui.unwrap();
+        ui.set_file_menu_open(false);
+        ui.set_edit_menu_open(false);
+        ui.set_help_menu_open(false);
+    });
 
     // --- Открыть файл ---
     let ui_handle = ui.as_weak();
