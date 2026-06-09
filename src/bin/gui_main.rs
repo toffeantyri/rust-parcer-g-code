@@ -43,41 +43,53 @@ fn main() {
     });
 
     // --- Открыть файл ---
-    let ui_handle = ui.as_weak();
+    let weak_ui = ui.as_weak();
     ui.on_menu_file_open(move || {
-        let ui = ui_handle.unwrap();
-        ui.set_status_text("Выберите файл...".into());
+        let weak = weak_ui.clone();
+        std::thread::spawn(move || {
+            let file = rfd::FileDialog::new()
+                .add_filter("G-Code", &["txt", "nc", "cnc", "gcode", "ngc"])
+                .set_title("Выберите файл G-кода")
+                .pick_file();
 
-        let file = rfd::FileDialog::new()
-            .add_filter("G-Code", &["txt", "nc", "cnc", "gcode", "ngc"])
-            .set_title("Выберите файл G-кода")
-            .pick_file();
+            if let Some(path) = file {
+                let path_str = path.to_string_lossy().to_string();
+                let content = fs::read_to_string(&path).ok();
 
-        if let Some(path) = file {
-            let path_str = path.to_string_lossy().to_string();
-            ui.set_file_path(path_str.into());
+                slint::invoke_from_event_loop(move || {
+                    let ui = weak.unwrap();
+                    ui.set_file_path(path_str.clone().into());
 
-            match fs::read_to_string(&path) {
-                Ok(content) => {
-                    let lines = content.lines().count();
-                    ui.set_code_content(content.into());
-                    ui.set_status_text(
-                        format!(
-                            "Загружен: {} ({} строк)",
-                            path.file_name().unwrap().to_string_lossy(),
-                            lines
-                        )
-                        .into(),
-                    );
-                }
-                Err(e) => {
-                    ui.set_code_content(format!("Ошибка: {}", e).into());
-                    ui.set_status_text(format!("Ошибка: {}", e).into());
-                }
+                    match content {
+                        Some(text) => {
+                            let lines = text.lines().count();
+                            ui.set_code_content(text.into());
+                            ui.set_status_text(
+                                format!(
+                                    "Загружен: {} ({} строк)",
+                                    std::path::Path::new(&path_str)
+                                        .file_name()
+                                        .unwrap()
+                                        .to_string_lossy(),
+                                    lines
+                                )
+                                .into(),
+                            );
+                        }
+                        None => {
+                            ui.set_status_text(format!("Ошибка чтения файла").into());
+                        }
+                    }
+                })
+                .unwrap();
+            } else {
+                slint::invoke_from_event_loop(move || {
+                    let ui = weak.unwrap();
+                    ui.set_status_text("Открытие файла отменено.".into());
+                })
+                .unwrap();
             }
-        } else {
-            ui.set_status_text("Открытие файла отменено.".into());
-        }
+        });
     });
 
     // --- Сохранить ---
@@ -99,25 +111,33 @@ fn main() {
     });
 
     // --- Сохранить как ---
-    let ui_handle = ui.as_weak();
+    let weak_ui = ui.as_weak();
     ui.on_menu_file_save_as(move || {
-        let ui = ui_handle.unwrap();
-        let file = rfd::FileDialog::new()
-            .add_filter("G-Code", &["nc", "cnc", "txt", "gcode"])
-            .set_title("Сохранить как...")
-            .save_file();
+        let weak = weak_ui.clone();
+        std::thread::spawn(move || {
+            let file = rfd::FileDialog::new()
+                .add_filter("G-Code", &["nc", "cnc", "txt", "gcode"])
+                .set_title("Сохранить как...")
+                .save_file();
 
-        if let Some(path) = file {
-            let path_str = path.to_string_lossy().to_string();
-            let content = ui.get_code_content().to_string();
-            match fs::write(&path, &content) {
-                Ok(_) => {
-                    ui.set_file_path(path_str.into());
-                    ui.set_status_text("Сохранено".into());
-                }
-                Err(e) => ui.set_status_text(format!("Ошибка: {}", e).into()),
+            if let Some(path) = file {
+                let path_str = path.to_string_lossy().to_string();
+                // Получаем контент до вызова invoke, чтобы не дергать ui из другого потока
+
+                slint::invoke_from_event_loop(move || {
+                    let ui = weak.unwrap();
+                    let content = ui.get_code_content().to_string();
+                    ui.set_file_path(path_str.clone().into());
+
+                    // fs::write тоже в потоке, но это быстро. Можно и здесь.
+                    match std::fs::write(&path_str, &content) {
+                        Ok(_) => ui.set_status_text("Сохранено".into()),
+                        Err(e) => ui.set_status_text(format!("Ошибка: {}", e).into()),
+                    }
+                })
+                .unwrap();
             }
-        }
+        });
     });
 
     // --- Закрыть файл ---
