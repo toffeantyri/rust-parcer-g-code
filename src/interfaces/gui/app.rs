@@ -26,6 +26,17 @@ impl eframe::App for GCodeApp {
         // Если приложение занято (диалог открыт) — блокируем кнопки
         let is_busy = self.model.is_busy;
 
+        // Проверяем, не был ли запрошен выход через крестик окна
+        if ctx.input(|i| i.viewport().close_requested()) {
+            if self.model.modified && !self.model.file_path.is_empty() {
+                // Отменяем закрытие и показываем диалог
+                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+                self.model.show_exit_dialog = true;
+                self.model.pending_action = Some(super::model::PendingAction::Exit);
+            }
+            // Если modified = false — окно закроется автоматически
+        }
+
         // 1. View → Intent: собираем намерения от UI
         let intents = view::collect_intents(ctx, is_busy, &self.model.file_path);
 

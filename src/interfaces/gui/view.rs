@@ -225,6 +225,7 @@ pub fn view_exit_dialog(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
         .open(&mut is_open)
         .resizable(false)
         .collapsible(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .default_size([350.0, 120.0])
         .show(ctx, |ui| {
             ui.label("Do you want to save changes?");
