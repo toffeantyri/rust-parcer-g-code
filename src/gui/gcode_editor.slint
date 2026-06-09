@@ -88,14 +88,13 @@ export component GCodeEditor inherits Window {
         }
 
         sa := TextEdit {
-                //text: root.code_content;
-                //edited(str) <=> { root.code_content = str; }
-                text <=> root.code_content;
-                font-family: "Consolas";
+                text: root.code_content;
+                font-family: "monospace";
                 font-size: 13px;
                 read-only: false;
                 horizontal-stretch: 1;
                 vertical-stretch: 1;
+                wrap: no-wrap;
         }
 
         Rectangle {
