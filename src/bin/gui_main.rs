@@ -48,13 +48,18 @@ fn main() {
         let weak = weak_ui.clone();
         std::thread::spawn(move || {
             let file = rfd::FileDialog::new()
-                .add_filter("G-Code", &["txt", "nc", "cnc", "gcode", "ngc"])
+                .add_filter("G-Code", &["txt", "nc", "cnc", "mpf", "spf"])
                 .set_title("Выберите файл G-кода")
                 .pick_file();
 
             if let Some(path) = file {
                 let path_str = path.to_string_lossy().to_string();
-                let content = fs::read_to_string(&path).ok();
+                let content = fs::read_to_string(&path).ok().map(|s| {
+                    s.replace("\r\n", "\n")
+                        .replace("\r", "\n")
+                        .trim_start_matches('\u{feff}')
+                        .to_string()
+                });
 
                 slint::invoke_from_event_loop(move || {
                     let ui = weak.unwrap();
