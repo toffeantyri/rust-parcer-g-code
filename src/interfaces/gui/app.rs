@@ -38,7 +38,9 @@ impl eframe::App for GCodeApp {
         view::view_statusbar(&self.model, ctx);
         view::view_editor(&mut self.model, ctx);
 
-        // Запрашиваем перерисовку каждые 50 мс для обработки событий
-        ctx.request_repaint_after(std::time::Duration::from_millis(50));
+        // Запрашиваем перерисовку только когда нужна анимация спиннера
+        if self.model.is_busy {
+            ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        }
     }
 }
