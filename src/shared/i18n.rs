@@ -54,6 +54,7 @@ pub struct MenuStrings {
     pub shortcuts: String,
     pub about: String,
     pub settings: String,
+    pub shortcuts_title: String,
     pub language: String,
     pub lang_ru: String,
     pub lang_en: String,

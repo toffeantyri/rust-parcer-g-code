@@ -21,6 +21,8 @@ pub struct Model {
     pub modified: bool,
     /// Флаг: показать диалог подтверждения выхода
     pub show_exit_dialog: bool,
+    /// Флаг: показать окно горячих клавиш
+    pub shortcuts_open: bool,
     /// Действие, которое нужно выполнить после подтверждения диалога
     pub pending_action: Option<PendingAction>,
     /// Действие, ожидающее завершения сохранения в data layer

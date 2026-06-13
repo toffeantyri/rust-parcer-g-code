@@ -7,8 +7,8 @@ use egui::accesskit::{Role, Toggled};
 use egui_kittest::{kittest::Queryable, Harness};
 
 use code_parser::interfaces::gui::{
-    collect_intents, view_editor, view_exit_dialog, view_settings, view_statusbar, FormatSettings,
-    Model,
+    collect_intents, view_editor, view_exit_dialog, view_settings, view_shortcuts, view_statusbar,
+    FormatSettings, Model,
 };
 use code_parser::shared::i18n;
 
@@ -311,4 +311,61 @@ fn test_settings_menu_language_toggle() {
 
     assert!(harness.query_by_label("English").is_some());
     assert!(harness.query_by_label("Русский").is_some());
+}
+
+// ---------------------------------------------------------------------------
+// Shortcuts window
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_shortcuts_window_shown_when_open() {
+    i18n::set_lang("en");
+    let model = Model {
+        shortcuts_open: true,
+        ..Default::default()
+    };
+
+    let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
+        let _intents = view_shortcuts(&model, ui.ctx());
+    });
+    harness.run();
+
+    // Окно горячих клавиш должно быть видно — проверяем по содержимому
+    assert!(harness.query_by_label("Ctrl+O").is_some());
+    assert!(harness.query_by_label("Ctrl+S").is_some());
+    assert!(harness.query_by_label("F5").is_some());
+    assert!(harness.query_by_label("F6").is_some());
+}
+
+#[test]
+fn test_shortcuts_window_not_shown_by_default() {
+    i18n::set_lang("en");
+    let model = Model::default();
+
+    let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
+        let _intents = view_shortcuts(&model, ui.ctx());
+    });
+    harness.run();
+
+    assert!(harness.query_by_label("Shortcuts").is_none());
+}
+
+#[test]
+fn test_shortcuts_window_shown_russian() {
+    i18n::set_lang("ru");
+    let model = Model {
+        shortcuts_open: true,
+        ..Default::default()
+    };
+
+    let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
+        let _intents = view_shortcuts(&model, ui.ctx());
+    });
+    harness.run();
+
+    assert!(
+        harness.query_by_label("Горячие клавиши").is_some()
+            || harness.query_by_label("Ctrl+O").is_some()
+    );
+    assert!(harness.query_by_label("Ctrl+S").is_some());
 }

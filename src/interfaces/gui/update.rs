@@ -50,6 +50,9 @@ impl Model {
                 self.show_exit_dialog = false;
                 self.pending_action = None;
             }
+            Intent::ToggleShortcuts => {
+                self.shortcuts_open = !self.shortcuts_open;
+            }
             Intent::SetLanguage(lang) => {
                 self.format_settings.language = lang.clone();
                 i18n::set_lang(lang);

@@ -285,6 +285,7 @@ impl eframe::App for GCodeApp {
         let mut all_intents = view::collect_intents(ctx, is_busy, &self.model);
         all_intents.extend(view::view_settings(&self.model, ctx));
         all_intents.extend(view::view_exit_dialog(&self.model, ctx));
+        all_intents.extend(view::view_shortcuts(&self.model, ctx));
 
         // 2. Intent — обрабатываем через handle_intent
         for intent in &all_intents {
@@ -643,5 +644,15 @@ mod tests {
         app.handle_intent(&Intent::DiscardAndContinue);
         assert!(app.model.is_busy);
         assert!(!app.model.show_exit_dialog);
+    }
+
+    #[test]
+    fn test_intent_toggle_shortcuts() {
+        let mut app = make_app();
+        assert!(!app.model.shortcuts_open);
+        app.handle_intent(&Intent::ToggleShortcuts);
+        assert!(app.model.shortcuts_open);
+        app.handle_intent(&Intent::ToggleShortcuts);
+        assert!(!app.model.shortcuts_open);
     }
 }
