@@ -318,9 +318,18 @@ mod tests {
     fn test_axis_expr() {
         let tokens = tokenize("Z=71.304 X=160+10 Y=3*5/2");
 
-        assert_eq!(tokens[0], Token::AxisExpr("Z".to_string(), "71.304".to_string()));
-        assert_eq!(tokens[1], Token::AxisExpr("X".to_string(), "160+10".to_string()));
-        assert_eq!(tokens[2], Token::AxisExpr("Y".to_string(), "3*5/2".to_string()));
+        assert_eq!(
+            tokens[0],
+            Token::AxisExpr("Z".to_string(), "71.304".to_string())
+        );
+        assert_eq!(
+            tokens[1],
+            Token::AxisExpr("X".to_string(), "160+10".to_string())
+        );
+        assert_eq!(
+            tokens[2],
+            Token::AxisExpr("Y".to_string(), "3*5/2".to_string())
+        );
     }
 
     #[test]
@@ -339,7 +348,10 @@ mod tests {
 
         assert_eq!(tokens[0], Token::GCode(0));
         // Всё в скобках — Word (скобочное выражение)
-        assert_eq!(tokens[1], Token::Word("(comment (nested) content)".to_string()));
+        assert_eq!(
+            tokens[1],
+            Token::Word("(comment (nested) content)".to_string())
+        );
         assert_eq!(tokens[2], Token::Axis("X".to_string(), Some(10.0)));
     }
 
@@ -351,7 +363,10 @@ mod tests {
         assert_eq!(tokens[0], Token::Word("MODECHECK(2)".to_string()));
         assert_eq!(tokens[1], Token::Word("TRANS".to_string()));
         assert_eq!(tokens[2], Token::Axis("Z".to_string(), Some(-8.0)));
-        assert_eq!(tokens[3], Token::Word("MATLCH(\"DISKD125\",0,1)".to_string()));
+        assert_eq!(
+            tokens[3],
+            Token::Word("MATLCH(\"DISKD125\",0,1)".to_string())
+        );
     }
 
     #[test]
@@ -372,5 +387,69 @@ mod tests {
         assert_eq!(tokens[0], Token::Axis("Z".to_string(), Some(71.304)));
         assert_eq!(tokens[1], Token::NewLine);
         assert_eq!(tokens[2], Token::Axis("Y".to_string(), Some(-58.346)));
+    }
+
+    // -----------------------------------------------------------------------
+    // Пограничные случаи
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_word_with_space_before_paren() {
+        // Пробел между многосимвольным словом и скобкой
+        let tokens = tokenize("MODECHECK (2)");
+        assert_eq!(tokens[0], Token::Word("MODECHECK(2)".to_string()));
+    }
+
+    #[test]
+    fn test_comment_at_end_of_line() {
+        // Комментарий после команды на той же строке
+        let tokens = tokenize("G0 X10 ;это комментарий\nG1 Y20");
+
+        assert_eq!(tokens[0], Token::GCode(0));
+        assert_eq!(tokens[1], Token::Axis("X".to_string(), Some(10.0)));
+        assert_eq!(tokens[2], Token::Comment("это комментарий".to_string()));
+        assert_eq!(tokens[3], Token::NewLine);
+        assert_eq!(tokens[4], Token::GCode(1));
+        assert_eq!(tokens[5], Token::Axis("Y".to_string(), Some(20.0)));
+    }
+
+    #[test]
+    fn test_unknown_symbols() {
+        // Неизвестные символы не должны вызывать панику
+        let tokens = tokenize("@#$%");
+        assert_eq!(tokens[0], Token::Unknown('@'));
+        assert_eq!(tokens[1], Token::Unknown('#'));
+        assert_eq!(tokens[2], Token::Unknown('$'));
+        assert_eq!(tokens[3], Token::Unknown('%'));
+    }
+
+    #[test]
+    fn test_axis_with_negative_value() {
+        // Ось с отрицательным числом без пробела, без G-кода
+        let tokens = tokenize("X-10");
+        assert_eq!(tokens[0], Token::Axis("X".to_string(), Some(-10.0)));
+    }
+
+    #[test]
+    fn test_empty_input() {
+        // Пустой ввод не должен паниковать
+        let tokens = tokenize("");
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn test_whitespace_only() {
+        // Только пробелы без перевода строки
+        let tokens = tokenize("   \t  ");
+        assert!(tokens.is_empty());
+    }
+
+    #[test]
+    fn test_whitespace_with_newlines() {
+        // Пробелы с переводами строк — NewLine сохраняются
+        let tokens = tokenize("  \n  \n");
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0], Token::NewLine);
+        assert_eq!(tokens[1], Token::NewLine);
     }
 }
