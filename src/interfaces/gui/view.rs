@@ -1,6 +1,11 @@
 //! View — отрисовка UI, возвращает намерения
 
+use std::sync::mpsc;
+use std::time::Instant;
+
 use eframe::egui;
+
+use crate::data_layer::EditorCommand;
 
 use super::intent::Intent;
 use super::model::Model;
@@ -189,7 +194,13 @@ pub fn view_settings(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
 }
 
 /// Отрисовывает редактор кода и отслеживает изменения.
-pub fn view_editor(model: &mut Model, ctx: &egui::Context) {
+pub fn view_editor(
+    model: &mut Model,
+    ctx: &egui::Context,
+    _cmd_tx: &mpsc::Sender<EditorCommand>,
+    last_text_change: &mut Instant,
+    pending_text: &mut Option<String>,
+) {
     let content_before = model.content.clone();
 
     egui::CentralPanel::default().show(ctx, |ui| {
@@ -207,9 +218,11 @@ pub fn view_editor(model: &mut Model, ctx: &egui::Context) {
             });
     });
 
-    // Если текст изменился — помечаем как modified
+    // Если текст изменился — помечаем как modified и отправляем TextChanged с coalesce
     if model.content != content_before {
         model.modified = true;
+        *pending_text = Some(model.content.clone());
+        *last_text_change = Instant::now();
     }
 }
 
