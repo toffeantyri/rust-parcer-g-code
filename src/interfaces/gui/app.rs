@@ -9,6 +9,7 @@ use crate::data_layer::{
     DialogCommand, DialogEvent, EditorCommand, EditorEvent, FileCommand, FileEvent,
     PipelineCommand, PipelineEvent,
 };
+use crate::shared::i18n;
 
 use super::model::Model;
 use super::view;
@@ -31,7 +32,7 @@ pub struct GCodeApp {
 impl GCodeApp {
     pub fn new(cmd_tx: mpsc::Sender<EditorCommand>, evt_rx: mpsc::Receiver<EditorEvent>) -> Self {
         let mut model = Model {
-            status: "Готов к работе. Откройте файл G-кода.".to_string(),
+            status: i18n::locale().status.ready.to_string(),
             ..Default::default()
         };
         model.load_settings();
@@ -85,29 +86,21 @@ impl eframe::App for GCodeApp {
                             self.model.content = content;
                         }
                         if errors.is_empty() {
-                            self.model.status = "Форматирование завершено".to_string();
+                            self.model.status = i18n::locale().status.formatted.to_string();
                         } else {
                             let first = &errors[0];
-                            self.model.status = format!(
-                                "Найдено {} ошибок. Первая: {} [строка {}]",
-                                errors.len(),
-                                first.message,
-                                first.line,
-                            );
+                            self.model.status =
+                                i18n::fmt_errors_found(errors.len(), &first.message, first.line);
                         }
                         self.model.is_busy = false;
                     }
                     PipelineEvent::Validated { errors } => {
                         if errors.is_empty() {
-                            self.model.status = "Ошибок не найдено".to_string();
+                            self.model.status = i18n::locale().status.no_errors.to_string();
                         } else {
                             let first = &errors[0];
-                            self.model.status = format!(
-                                "Найдено {} ошибок. Первая: {} [строка {}]",
-                                errors.len(),
-                                first.message,
-                                first.line,
-                            );
+                            self.model.status =
+                                i18n::fmt_errors_found(errors.len(), &first.message, first.line);
                         }
                         self.model.is_busy = false;
                     }
@@ -118,7 +111,7 @@ impl eframe::App for GCodeApp {
                         self.model.file_path = file_path;
                         self.model.modified = false;
                         self.model.is_busy = false;
-                        self.model.status = "Файл открыт.".to_string();
+                        self.model.status = i18n::locale().status.file_opened.to_string();
                     }
                     FileEvent::Saved { file_path } => {
                         self.model.file_path = file_path;
@@ -133,7 +126,7 @@ impl eframe::App for GCodeApp {
                                 self.model.content.clear();
                                 self.model.file_path.clear();
                                 self.model.modified = false;
-                                self.model.status = "Файл закрыт.".to_string();
+                                self.model.status = i18n::locale().status.file_closed.to_string();
                             }
                             Some(super::model::PendingAction::OpenNewFile) => {
                                 self.model.is_busy = true;
@@ -141,7 +134,7 @@ impl eframe::App for GCodeApp {
                                     self.cmd_tx.send(EditorCommand::File(FileCommand::OpenFile));
                             }
                             None => {
-                                self.model.status = "Сохранено.".to_string();
+                                self.model.status = i18n::locale().status.saved.to_string();
                             }
                         }
                     }
@@ -189,9 +182,9 @@ impl eframe::App for GCodeApp {
             match intent {
                 super::intent::Intent::Format => {
                     if self.model.content.is_empty() {
-                        self.model.status = "Редактор пуст. Нечего форматировать.".to_string();
+                        self.model.status = i18n::locale().status.empty_editor.to_string();
                     } else {
-                        self.model.status = "Форматирование...".to_string();
+                        self.model.status = i18n::locale().status.formatting.to_string();
                         self.model.is_busy = true;
                         let settings = self.model.format_settings.clone();
                         let content = self.model.content.clone();
@@ -206,9 +199,9 @@ impl eframe::App for GCodeApp {
                 }
                 super::intent::Intent::Validate => {
                     if self.model.content.is_empty() {
-                        self.model.status = "Редактор пуст. Нечего проверять.".to_string();
+                        self.model.status = i18n::locale().status.empty_validate.to_string();
                     } else {
-                        self.model.status = "Проверка...".to_string();
+                        self.model.status = i18n::locale().status.validating.to_string();
                         self.model.is_busy = true;
                         let _ =
                             self.cmd_tx
@@ -273,7 +266,7 @@ impl eframe::App for GCodeApp {
                         Some(super::model::PendingAction::CloseFile) => {
                             self.model.content.clear();
                             self.model.file_path.clear();
-                            self.model.status = "Файл закрыт.".to_string();
+                            self.model.status = i18n::locale().status.file_closed.to_string();
                         }
                         Some(super::model::PendingAction::OpenNewFile) => {
                             self.model.is_busy = true;

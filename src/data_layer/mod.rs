@@ -4,6 +4,7 @@
 //!   UI ──EditorCommand──→ Data Thread
 //!   UI ←──EditorEvent──── Data Thread
 
+use crate::shared::i18n;
 use std::sync::mpsc;
 use std::thread;
 
@@ -197,7 +198,7 @@ impl DataLayer {
                 skip_empty_lines,
             } => {
                 self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
-                    message: "Форматирование...".to_string(),
+                    message: i18n::locale().status.formatting.clone(),
                     level: NotifyLevel::Info,
                 }));
                 let result = pipeline::format_code(content, *renumber_step, *skip_empty_lines);
@@ -210,7 +211,7 @@ impl DataLayer {
                     }
                     Err(e) => {
                         self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
-                            message: format!("Ошибка: {}", e),
+                            message: i18n::fmt_error(&e.to_string()),
                             level: NotifyLevel::Error,
                         }));
                     }
@@ -219,7 +220,7 @@ impl DataLayer {
             }
             PipelineCommand::Validate(content) => {
                 self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
-                    message: "Проверка...".to_string(),
+                    message: i18n::locale().status.validating.clone(),
                     level: NotifyLevel::Info,
                 }));
                 let result = pipeline::validate_code(content);
@@ -229,7 +230,7 @@ impl DataLayer {
                     }
                     Err(e) => {
                         self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
-                            message: format!("Ошибка: {}", e),
+                            message: i18n::fmt_error(&e.to_string()),
                             level: NotifyLevel::Error,
                         }));
                     }
@@ -266,13 +267,13 @@ impl DataLayer {
                             file_path: file_path.clone(),
                         }));
                         self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
-                            message: format!("Сохранено: {}", file_path),
+                            message: i18n::fmt_saved(&file_path),
                             level: NotifyLevel::Info,
                         }));
                     }
                     Err(e) => {
                         self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
-                            message: format!("Ошибка сохранения: {}", e),
+                            message: i18n::fmt_save_error(&e.to_string()),
                             level: NotifyLevel::Error,
                         }));
                     }
@@ -304,7 +305,7 @@ impl DataLayer {
                                 }
                                 Err(e) => {
                                     self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
-                                        message: format!("Ошибка: {}", e),
+                                        message: i18n::fmt_error(&e.to_string()),
                                         level: NotifyLevel::Error,
                                     }));
                                 }
@@ -322,13 +323,13 @@ impl DataLayer {
                                         file_path: path.clone(),
                                     }));
                                     self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
-                                        message: format!("Сохранено: {}", path),
+                                        message: i18n::fmt_saved(&path),
                                         level: NotifyLevel::Info,
                                     }));
                                 }
                                 Err(e) => {
                                     self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
-                                        message: format!("Ошибка сохранения: {}", e),
+                                        message: i18n::fmt_save_error(&e.to_string()),
                                         level: NotifyLevel::Error,
                                     }));
                                 }

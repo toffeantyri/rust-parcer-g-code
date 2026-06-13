@@ -1,0 +1,53 @@
+# English locale for G-Code Editor
+status:
+  ready: "Ready. Open a G-code file."
+  formatting: "Formatting..."
+  formatted: "Formatting complete"
+  validating: "Validating..."
+  no_errors: "No errors found"
+  file_closed: "File closed."
+  saved: "Saved."
+  saved_as: "Saved: {path}"
+  file_opened: "File opened."
+  empty_editor: "Editor is empty. Nothing to format."
+  empty_validate: "Editor is empty. Nothing to validate."
+  save_error: "Save error: {msg}"
+  error_prefix: "Error: {msg}"
+  errors_found: "Found {count} errors. First: {msg} [line {line}]"
+
+menu:
+  file: "File"
+  open: "Open..."
+  save: "Save"
+  save_as: "Save as..."
+  close: "Close"
+  exit: "Exit"
+  edit: "Edit"
+  format: "Format (F5)"
+  validate: "Validate (F6)"
+  format_settings: "Format Settings..."
+  help: "Help"
+  shortcuts: "Shortcuts"
+  about: "About"
+  language: "Language"
+  lang_ru: "Русский"
+  lang_en: "English"
+
+toolbar:
+  open: "Open"
+  save: "Save"
+  format: "Format"
+  check: "Check"
+
+dialog:
+  exit_title: "Save changes?"
+  confirm_save: "Save changes before exiting?"
+  btn_save: "Save"
+  btn_discard: "Discard"
+  btn_cancel: "Cancel"
+
+settings:
+  title: "Format Settings"
+  renumber_step: "Renumber step:"
+  skip_empty: "Skip empty lines when renumbering"
+  examples: "Examples:"

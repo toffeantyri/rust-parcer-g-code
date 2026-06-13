@@ -7,6 +7,8 @@ use eframe::egui;
 
 use crate::data_layer::EditorCommand;
 
+use crate::shared::i18n;
+
 use super::intent::Intent;
 use super::model::Model;
 
@@ -16,65 +18,65 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool, file_path: &str) -> V
 
     egui::TopBottomPanel::top("menu_panel").show(ctx, |ui| {
         egui::menu::bar(ui, |ui| {
-            ui.menu_button("File", |ui| {
+            ui.menu_button(&i18n::locale().menu.file, |ui| {
                 if ui
-                    .add_enabled(!is_busy, egui::Button::new("Open..."))
+                    .add_enabled(!is_busy, egui::Button::new(&i18n::locale().menu.open))
                     .clicked()
                 {
                     intents.push(Intent::OpenFile);
                     ui.close_menu();
                 }
                 if ui
-                    .add_enabled(!is_busy, egui::Button::new("Save"))
+                    .add_enabled(!is_busy, egui::Button::new(&i18n::locale().menu.save))
                     .clicked()
                 {
                     intents.push(Intent::SaveFile);
                     ui.close_menu();
                 }
                 if ui
-                    .add_enabled(!is_busy, egui::Button::new("Save as..."))
+                    .add_enabled(!is_busy, egui::Button::new(&i18n::locale().menu.save_as))
                     .clicked()
                 {
                     intents.push(Intent::SaveAs);
                     ui.close_menu();
                 }
-                if ui.button("Close").clicked() {
+                if ui.button(&i18n::locale().menu.close).clicked() {
                     intents.push(Intent::CloseFile);
                     ui.close_menu();
                 }
                 ui.separator();
-                if ui.button("Exit").clicked() {
+                if ui.button(&i18n::locale().menu.exit).clicked() {
                     intents.push(Intent::Exit);
                     ui.close_menu();
                 }
             });
-            ui.menu_button("Edit", |ui| {
+            ui.menu_button(&i18n::locale().menu.edit, |ui| {
                 if ui
-                    .add_enabled(!is_busy, egui::Button::new("Format (F5)"))
+                    .add_enabled(!is_busy, egui::Button::new(&i18n::locale().menu.format))
                     .clicked()
                 {
                     intents.push(Intent::Format);
                     ui.close_menu();
                 }
                 if ui
-                    .add_enabled(!is_busy, egui::Button::new("Validate (F6)"))
+                    .add_enabled(!is_busy, egui::Button::new(&i18n::locale().menu.validate))
                     .clicked()
                 {
                     intents.push(Intent::Validate);
                     ui.close_menu();
                 }
                 ui.separator();
-                if ui.button("Format Settings...").clicked() {
+                if ui.button(&i18n::locale().menu.format_settings).clicked() {
                     intents.push(Intent::ToggleSettings);
                     ui.close_menu();
                 }
             });
-            ui.menu_button("Help", |ui| {
-                if ui.button("Shortcuts").clicked() {
+            ui.menu_button(&i18n::locale().menu.help, |ui| {
+                if ui.button(&i18n::locale().menu.shortcuts).clicked() {
                     ui.close_menu();
                 }
                 ui.separator();
-                if ui.button("About").clicked() {
+                if ui.button(&i18n::locale().menu.about).clicked() {
                     ui.close_menu();
                 }
             });
@@ -84,25 +86,25 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool, file_path: &str) -> V
     egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
         ui.horizontal(|ui| {
             if ui
-                .add_enabled(!is_busy, egui::Button::new("Open"))
+                .add_enabled(!is_busy, egui::Button::new(&i18n::locale().toolbar.open))
                 .clicked()
             {
                 intents.push(Intent::OpenFile);
             }
             if ui
-                .add_enabled(!is_busy, egui::Button::new("Save"))
+                .add_enabled(!is_busy, egui::Button::new(&i18n::locale().toolbar.save))
                 .clicked()
             {
                 intents.push(Intent::SaveFile);
             }
             if ui
-                .add_enabled(!is_busy, egui::Button::new("Format"))
+                .add_enabled(!is_busy, egui::Button::new(&i18n::locale().toolbar.format))
                 .clicked()
             {
                 intents.push(Intent::Format);
             }
             if ui
-                .add_enabled(!is_busy, egui::Button::new("Check"))
+                .add_enabled(!is_busy, egui::Button::new(&i18n::locale().toolbar.check))
                 .clicked()
             {
                 intents.push(Intent::Validate);
@@ -157,12 +159,12 @@ pub fn view_settings(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
         return intents;
     }
 
-    egui::Window::new("Format Settings")
+    egui::Window::new(&i18n::locale().settings.title)
         .open(&mut open_copy)
         .resizable(false)
         .default_size([320.0, 200.0])
         .show(ctx, |ui| {
-            ui.label("Renumber step:");
+            ui.label(&i18n::locale().settings.renumber_step);
             ui.horizontal(|ui| {
                 for &step in &[1u32, 10, 100] {
                     let selected = model.format_settings.renumber_step == step;
@@ -172,13 +174,13 @@ pub fn view_settings(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
                 }
             });
             ui.add_space(8.0);
-            ui.label("Examples:");
+            ui.label(&i18n::locale().settings.examples);
             let step = model.format_settings.renumber_step;
             ui.label(format!("N{} N{} N{} ...", step, step * 2, step * 3));
             ui.add_space(12.0);
             let mut skip = model.format_settings.skip_empty_lines;
             if ui
-                .checkbox(&mut skip, "Skip empty lines when renumbering")
+                .checkbox(&mut skip, &i18n::locale().settings.skip_empty)
                 .changed()
             {
                 intents.push(Intent::SetSkipEmptyLines(skip));
@@ -234,23 +236,23 @@ pub fn view_exit_dialog(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
     }
 
     let mut is_open = true;
-    egui::Window::new("Save changes?")
+    egui::Window::new(&i18n::locale().dialog.exit_title)
         .open(&mut is_open)
         .resizable(false)
         .collapsible(false)
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .default_size([350.0, 120.0])
         .show(ctx, |ui| {
-            ui.label("Do you want to save changes?");
+            ui.label(&i18n::locale().dialog.confirm_save);
             ui.add_space(12.0);
             ui.horizontal(|ui| {
-                if ui.button("Save").clicked() {
+                if ui.button(&i18n::locale().dialog.btn_save).clicked() {
                     intents.push(Intent::ConfirmSave);
                 }
-                if ui.button("Discard").clicked() {
+                if ui.button(&i18n::locale().dialog.btn_discard).clicked() {
                     intents.push(Intent::DiscardAndContinue);
                 }
-                if ui.button("Cancel").clicked() {
+                if ui.button(&i18n::locale().dialog.btn_cancel).clicked() {
                     intents.push(Intent::CancelAction);
                 }
             });
