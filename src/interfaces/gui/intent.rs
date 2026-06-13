@@ -22,4 +22,6 @@ pub enum Intent {
     DiscardAndContinue,
     /// Отмена действия
     CancelAction,
+    /// Установить язык интерфейса ("ru" или "en")
+    SetLanguage(String),
 }

@@ -2,6 +2,7 @@
 
 use super::intent::Intent;
 use super::model::Model;
+use crate::shared::i18n;
 
 impl Model {
     /// Применяет намерение пользователя к модели.
@@ -48,6 +49,11 @@ impl Model {
             Intent::CancelAction => {
                 self.show_exit_dialog = false;
                 self.pending_action = None;
+            }
+            Intent::SetLanguage(lang) => {
+                self.format_settings.language = lang.clone();
+                i18n::set_lang(lang);
+                self.save_settings();
             }
         }
     }

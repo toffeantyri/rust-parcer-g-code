@@ -13,7 +13,7 @@ use super::intent::Intent;
 use super::model::Model;
 
 /// Собирает намерения от UI: меню + панель инструментов.
-pub fn collect_intents(ctx: &egui::Context, is_busy: bool, file_path: &str) -> Vec<Intent> {
+pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &Model) -> Vec<Intent> {
     let mut intents = Vec::new();
 
     egui::TopBottomPanel::top("menu_panel").show(ctx, |ui| {
@@ -71,6 +71,24 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool, file_path: &str) -> V
                     ui.close_menu();
                 }
             });
+            ui.menu_button(&i18n::locale().menu.settings, |ui| {
+                let is_ru = model.format_settings.language == "ru";
+                if ui
+                    .selectable_label(is_ru, &i18n::locale().menu.lang_ru)
+                    .clicked()
+                    && !is_ru
+                {
+                    intents.push(Intent::SetLanguage("ru".to_string()));
+                }
+                let is_en = model.format_settings.language == "en";
+                if ui
+                    .selectable_label(is_en, &i18n::locale().menu.lang_en)
+                    .clicked()
+                    && !is_en
+                {
+                    intents.push(Intent::SetLanguage("en".to_string()));
+                }
+            });
             ui.menu_button(&i18n::locale().menu.help, |ui| {
                 if ui.button(&i18n::locale().menu.shortcuts).clicked() {
                     ui.close_menu();
@@ -111,7 +129,7 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool, file_path: &str) -> V
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.label(
-                    egui::RichText::new(file_path)
+                    egui::RichText::new(&model.file_path)
                         .size(12.0)
                         .color(egui::Color32::GRAY),
                 );

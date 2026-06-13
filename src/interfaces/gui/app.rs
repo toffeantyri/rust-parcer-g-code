@@ -36,6 +36,7 @@ impl GCodeApp {
             ..Default::default()
         };
         model.load_settings();
+        i18n::set_lang(&model.format_settings.language);
         Self {
             model,
             cmd_tx,
@@ -172,7 +173,7 @@ impl eframe::App for GCodeApp {
         }
 
         // 1. View → Intent: собираем намерения от UI
-        let mut all_intents = view::collect_intents(ctx, is_busy, &self.model.file_path);
+        let mut all_intents = view::collect_intents(ctx, is_busy, &self.model);
         all_intents.extend(view::view_settings(&self.model, ctx));
         all_intents.extend(view::view_exit_dialog(&self.model, ctx));
 

@@ -42,6 +42,8 @@ pub struct FormatSettings {
     pub renumber_step: u32,
     /// Пропускать пустые строки при перенумерации
     pub skip_empty_lines: bool,
+    /// Язык интерфейса: "ru" или "en"
+    pub language: String,
 }
 
 impl Default for FormatSettings {
@@ -49,6 +51,7 @@ impl Default for FormatSettings {
         Self {
             renumber_step: 1,
             skip_empty_lines: true,
+            language: "ru".to_string(),
         }
     }
 }
