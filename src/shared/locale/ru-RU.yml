@@ -1,0 +1,54 @@
+# Русская локаль G-Code Editor
+status:
+  ready: "Готов к работе. Откройте файл G-кода."
+  formatting: "Форматирование..."
+  formatted: "Форматирование завершено"
+  validating: "Проверка..."
+  no_errors: "Ошибок не найдено"
+  file_closed: "Файл закрыт."
+  saved: "Сохранено."
+  saved_as: "Сохранено: {path}"
+  file_opened: "Файл открыт."
+  empty_editor: "Редактор пуст. Нечего форматировать."
+  empty_validate: "Редактор пуст. Нечего проверять."
+  save_error: "Ошибка сохранения: {msg}"
+  error_prefix: "Ошибка: {msg}"
+  errors_found: "Найдено {count} ошибок. Первая: {msg} [строка {line}]"
+
+menu:
+  file: "Файл"
+  open: "Открыть..."
+  save: "Сохранить"
+  save_as: "Сохранить как..."
+  close: "Закрыть"
+  exit: "Выход"
+  edit: "Правка"
+  format: "Форматировать (F5)"
+  validate: "Проверить (F6)"
+  format_settings: "Настройки форматирования..."
+  help: "Помощь"
+  shortcuts: "Горячие клавиши"
+  about: "О программе"
+  settings: "Настройки"
+  language: "Язык"
+  lang_ru: "Русский"
+  lang_en: "English"
+
+toolbar:
+  open: "Открыть"
+  save: "Сохранить"
+  format: "Форматировать"
+  check: "Проверить"
+
+dialog:
+  exit_title: "Сохранить изменения?"
+  confirm_save: "Сохранить изменения перед выходом?"
+  btn_save: "Сохранить"
+  btn_discard: "Не сохранять"
+  btn_cancel: "Отмена"
+
+settings:
+  title: "Настройки форматирования"
+  renumber_step: "Шаг перенумерации:"
+  skip_empty: "Пропускать пустые строки при перенумерации"
+  examples: "Примеры:"

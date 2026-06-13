@@ -8,6 +8,7 @@
 //! - shared: общие типы (ошибки, конфиги)
 
 pub mod application;
+pub mod data_layer;
 pub mod domain;
 pub mod infrastructure;
 pub mod interfaces;

@@ -2,8 +2,9 @@
 //!
 //! Читает файл, передаёт данные в application через infrastructure.
 
-use std::fs;
 use std::process;
+
+use anyhow::Context;
 
 use crate::application::{validate, FormatConfig, Formatter, Parser};
 use crate::infrastructure::lexer::tokenize;
@@ -11,14 +12,17 @@ use crate::shared::Severity;
 
 /// Запускает полный цикл: чтение файла -> лексинг -> парсинг -> валидация -> форматирование -> вывод
 pub fn run(input_path: &str) {
-    // Чтение входного файла (infrastructure — работа с файловой системой)
-    let input_content = match fs::read_to_string(input_path) {
-        Ok(content) => content,
-        Err(e) => {
-            eprintln!("Ошибка чтения файла '{}': {}", input_path, e);
-            process::exit(1);
-        }
-    };
+    if let Err(e) = run_inner(input_path) {
+        eprintln!("{:#}", e);
+        process::exit(1);
+    }
+}
+
+/// Внутренняя функция с anyhow-обработкой ошибок
+fn run_inner(input_path: &str) -> anyhow::Result<()> {
+    // Чтение входного файла с контекстом
+    let input_content =
+        std::fs::read_to_string(input_path).context("Не удалось прочитать входной файл")?;
 
     if cfg!(debug_assertions) {
         println!("Контент файла: \n{}", input_content)
@@ -29,13 +33,7 @@ pub fn run(input_path: &str) {
 
     // Парсинг: токены -> AST
     let mut parser = Parser::new(tokens);
-    let program = match parser.parse_program() {
-        Ok(prog) => prog,
-        Err(e) => {
-            eprintln!("Ошибка парсинга: {}", e);
-            process::exit(1);
-        }
-    };
+    let program = parser.parse_program().context("Ошибка парсинга G-кода")?;
 
     // Валидация: проверка AST на ошибки
     let validation_messages = validate(&program);
@@ -49,9 +47,7 @@ pub fn run(input_path: &str) {
 
     // Если есть критические ошибки — не выводим результат
     if has_errors {
-        eprintln!();
-        eprintln!("Найдены критические ошибки. Форматирование отменено.");
-        process::exit(1);
+        anyhow::bail!("Найдены критические ошибки. Форматирование отменено.");
     }
 
     // Форматирование: AST -> строка
@@ -60,4 +56,6 @@ pub fn run(input_path: &str) {
 
     // Вывод результата
     print!("{}", formatted);
+
+    Ok(())
 }
