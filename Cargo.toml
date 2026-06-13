@@ -31,3 +31,6 @@ serde_json = "1.0"
 serde_yaml = "0.9"
 
 [build-dependencies]
+
+[dev-dependencies]
+tempfile = "3.0"
