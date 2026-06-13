@@ -135,8 +135,8 @@ pub fn spawn_data_layer() -> (mpsc::Sender<EditorCommand>, mpsc::Receiver<Editor
                     }
                     _ => {
                         // Если уже есть команда не TextChanged, сначала обрабатываем её
-                        if cmd.is_some() {
-                            data.process(&cmd.take().unwrap());
+                        if let Some(prev) = cmd.take() {
+                            data.process(&prev);
                         }
                         cmd = Some(c);
                     }

@@ -29,7 +29,7 @@
 - Один файл = одна логическая единица (модуль).
 - Имена файлов: `snake_case.rs`.
 - Модуль domain: только `struct`, `enum`, `trait` без реализации внешних эффектов.
-- Модуль infrastructure: реализует трейты из domain.
+- Модуль infrastructure: при наличии нескольких реализаций одного контракта — выделяй trait в domain и реализуй его в infrastructure. Для единственной реализации (как лексер) trait не обязателен.
 - Тесты рядом с кодом в `#[cfg(test)]`.
 
 ## Формат ответа (строго соблюдать)
@@ -41,9 +41,10 @@
 ## Требования к коду
 - Rust 2021 edition, следуй clippy.
 - Комментарии только на русском, но код и идентификаторы на английском.
-- Используй `anyhow` для ошибок в application, `thiserror` для domain.
-- Избегай `unwrap()` — используй `?` и обработку ошибок.
-- Для кода внутри `src/` используй `crate::` для обращения к другим модулям проекта, а не `code_parser::`.
+- `anyhow` — для сквозной обработки ошибок в interfaces/cli. В application используй конкретные типы ошибок из `shared` (ParseError, ValidationMessage).
+- `thiserror` — для типов ошибок в `shared`.
+- Избегай `unwrap()` — используй `?` и обработку ошибок. `unwrap()` допустим только в тестах, в production коде — нет.
+- Для кода внутри `src/` используй `crate::` для обращения к другим модулям проекта, а не `code_parser::`. Исключение: бинарные крейты (`src/bin/`) — они обязаны обращаться по имени крейта (`code_parser::`), т.к. это отдельные entry points.
 
 ## Data Layer (отдельный поток)
 - `src/data_layer/mod.rs` — определения `EditorCommand`, `EditorEvent` и функция `spawn_data_layer()`.
@@ -76,21 +77,31 @@ main thread (egui UI)
 - Выход: при закрытии окна data thread завершается автоматически (канал закрывается).
 
 ### EditorCommand (команды от UI к data layer)
-- `TextChanged(String)` — текст изменился (для дебаунса).
-- `Format { content, renumber_step, skip_empty_lines }` — отформатировать.
-- `Validate(String)` — проверить.
-- `OpenFile` — открыть файл.
-- `SaveFile { path, content }` — сохранить файл.
-- `FilePickerResult { path, mode }` — результат выбора файла из диалога.
-- `DialogResult { confirmed }` — результат диалога подтверждения.
+Вложенные перечисления, группировка по concern'ам:
+- `Pipeline(PipelineCommand)`:
+  - `TextChanged(String)` — текст изменился (для дебаунса).
+  - `Format { content, renumber_step, skip_empty_lines }` — отформатировать.
+  - `Validate(String)` — проверить.
+- `File(FileCommand)`:
+  - `OpenFile` — открыть файл.
+  - `SaveFile { path: Option<String>, content: String }` — сохранить файл.
+- `Dialog(DialogCommand)`:
+  - `FilePickerResult { path, mode }` — результат выбора файла из диалога.
+  - `DialogResult { confirmed }` — результат диалога подтверждения.
 
 ### EditorEvent (события от data layer к UI)
-- `Formatted { content, errors, file_path }` — результат форматирования / открытия / сохранения.
-- `Validated { errors }` — результат проверки.
-- `RequestFilePicker { mode }` — запрос на открытие диалога выбора файла.
-- `RequestDialog { title, message }` — запрос на подтверждение.
-- `NotifyUser { message, level }` — уведомление пользователя.
-- `Idle` — data layer завершил обработку.
+Вложенные перечисления, группировка по concern'ам:
+- `Pipeline(PipelineEvent)`:
+  - `Formatted { content, errors }` — результат форматирования.
+  - `Validated { errors }` — результат проверки.
+- `File(FileEvent)`:
+  - `Loaded { content, file_path }` — файл загружен.
+  - `Saved { file_path }` — файл сохранён.
+- `Dialog(DialogEvent)`:
+  - `RequestFilePicker { mode }` — запрос на открытие диалога выбора файла.
+  - `RequestDialog { title, message }` — запрос на подтверждение.
+  - `NotifyUser { message, level }` — уведомление пользователя.
+  - `Idle` — data layer завершил обработку.
 
 ## Графический интерфейс (GUI)
 - GUI располагается в `src/interfaces/gui/`.
