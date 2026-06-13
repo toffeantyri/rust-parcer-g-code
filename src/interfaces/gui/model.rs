@@ -23,10 +23,8 @@ pub struct Model {
     pub show_exit_dialog: bool,
     /// Действие, которое нужно выполнить после подтверждения диалога
     pub pending_action: Option<PendingAction>,
-    /// Флаг: после сохранения нужно выйти из программы
-    pub exiting_after_save: bool,
-    /// Флаг: после сохранения нужно закрыть файл (игнорировать Formatted с file_path)
-    pub closing_after_save: bool,
+    /// Действие, ожидающее завершения сохранения в data layer
+    pub save_and_exec: Option<PendingAction>,
 }
 
 /// Действие, ожидающее подтверждения пользователя

@@ -5,7 +5,10 @@ use std::time::Instant;
 
 use eframe::egui;
 
-use crate::data_layer::{EditorCommand, EditorEvent};
+use crate::data_layer::{
+    DialogCommand, DialogEvent, EditorCommand, EditorEvent, FileCommand, FileEvent,
+    PipelineCommand, PipelineEvent,
+};
 
 use super::model::Model;
 use super::view;
@@ -53,7 +56,9 @@ impl GCodeApp {
 
     fn flush_pending_text(&mut self) {
         if let Some(text) = self.pending_text.take() {
-            let _ = self.cmd_tx.send(EditorCommand::TextChanged(text));
+            let _ = self
+                .cmd_tx
+                .send(EditorCommand::Pipeline(PipelineCommand::TextChanged(text)));
         }
     }
 }
@@ -74,76 +79,95 @@ impl eframe::App for GCodeApp {
         // === Получение событий от data layer ===
         while let Ok(event) = self.evt_rx.try_recv() {
             match event {
-                EditorEvent::Formatted {
-                    content,
-                    errors,
-                    file_path,
-                } => {
-                    if !content.is_empty() {
+                EditorEvent::Pipeline(pe) => match pe {
+                    PipelineEvent::Formatted { content, errors } => {
+                        if !content.is_empty() {
+                            self.model.content = content;
+                        }
+                        if errors.is_empty() {
+                            self.model.status = "Форматирование завершено".to_string();
+                        } else {
+                            let first = &errors[0];
+                            self.model.status = format!(
+                                "Найдено {} ошибок. Первая: {} [строка {}]",
+                                errors.len(),
+                                first.message,
+                                first.line,
+                            );
+                        }
+                        self.model.is_busy = false;
+                    }
+                    PipelineEvent::Validated { errors } => {
+                        if errors.is_empty() {
+                            self.model.status = "Ошибок не найдено".to_string();
+                        } else {
+                            let first = &errors[0];
+                            self.model.status = format!(
+                                "Найдено {} ошибок. Первая: {} [строка {}]",
+                                errors.len(),
+                                first.message,
+                                first.line,
+                            );
+                        }
+                        self.model.is_busy = false;
+                    }
+                },
+                EditorEvent::File(fe) => match fe {
+                    FileEvent::Loaded { content, file_path } => {
                         self.model.content = content;
-                    }
-                    // Если закрываем файл — не восстанавливаем file_path из ответа data layer
-                    if self.model.closing_after_save {
-                        self.model.closing_after_save = false;
-                    } else if let Some(path) = file_path {
-                        self.model.file_path = path;
+                        self.model.file_path = file_path;
                         self.model.modified = false;
+                        self.model.is_busy = false;
+                        self.model.status = "Файл открыт.".to_string();
                     }
-                    if errors.is_empty() {
-                        self.model.status = "Форматирование завершено".to_string();
-                    } else {
-                        let first = &errors[0];
-                        self.model.status = format!(
-                            "Найдено {} ошибок. Первая: {} [строка {}]",
-                            errors.len(),
-                            first.message,
-                            first.line,
-                        );
+                    FileEvent::Saved { file_path } => {
+                        self.model.file_path = file_path;
+                        self.model.modified = false;
+                        self.model.is_busy = false;
+                        // Если после сохранения ожидается действие — выполняем
+                        match self.model.save_and_exec.take() {
+                            Some(super::model::PendingAction::Exit) => {
+                                std::process::exit(0);
+                            }
+                            Some(super::model::PendingAction::CloseFile) => {
+                                self.model.content.clear();
+                                self.model.file_path.clear();
+                                self.model.modified = false;
+                                self.model.status = "Файл закрыт.".to_string();
+                            }
+                            Some(super::model::PendingAction::OpenNewFile) => {
+                                self.model.is_busy = true;
+                                let _ =
+                                    self.cmd_tx.send(EditorCommand::File(FileCommand::OpenFile));
+                            }
+                            None => {
+                                self.model.status = "Сохранено.".to_string();
+                            }
+                        }
                     }
-                    self.model.is_busy = false;
-                    // Если выходим — завершаем процесс после ответа data layer
-                    if self.model.exiting_after_save {
-                        std::process::exit(0);
-                    }
-                }
-                EditorEvent::Validated { errors } => {
-                    if errors.is_empty() {
-                        self.model.status = "Ошибок не найдено".to_string();
-                    } else {
-                        let first = &errors[0];
-                        self.model.status = format!(
-                            "Найдено {} ошибок. Первая: {} [строка {}]",
-                            errors.len(),
-                            first.message,
-                            first.line,
-                        );
-                    }
-                    self.model.is_busy = false;
-                }
-                EditorEvent::RequestFilePicker { mode } => {
-                    match mode {
+                },
+                EditorEvent::Dialog(de) => match de {
+                    DialogEvent::RequestFilePicker { mode } => match mode {
                         crate::data_layer::FilePickerMode::Open => {
                             self.awaiting_picker = true;
                         }
                         crate::data_layer::FilePickerMode::Save => {
                             self.awaiting_save_picker = true;
                         }
+                    },
+                    DialogEvent::RequestDialog {
+                        title: _,
+                        message: _,
+                    } => {
+                        self.awaiting_dialog = true;
                     }
-                    self.model.is_busy = false;
-                }
-                EditorEvent::RequestDialog {
-                    title: _,
-                    message: _,
-                } => {
-                    self.awaiting_dialog = true;
-                    self.model.is_busy = false;
-                }
-                EditorEvent::NotifyUser { message, level: _ } => {
-                    self.model.status = message;
-                }
-                EditorEvent::Idle => {
-                    self.model.is_busy = false;
-                }
+                    DialogEvent::NotifyUser { message, level: _ } => {
+                        self.model.status = message;
+                    }
+                    DialogEvent::Idle => {
+                        self.model.is_busy = false;
+                    }
+                },
             }
         }
 
@@ -171,11 +195,13 @@ impl eframe::App for GCodeApp {
                         self.model.is_busy = true;
                         let settings = self.model.format_settings.clone();
                         let content = self.model.content.clone();
-                        let _ = self.cmd_tx.send(EditorCommand::Format {
-                            content,
-                            renumber_step: settings.renumber_step,
-                            skip_empty_lines: settings.skip_empty_lines,
-                        });
+                        let _ =
+                            self.cmd_tx
+                                .send(EditorCommand::Pipeline(PipelineCommand::Format {
+                                    content,
+                                    renumber_step: settings.renumber_step,
+                                    skip_empty_lines: settings.skip_empty_lines,
+                                }));
                     }
                 }
                 super::intent::Intent::Validate => {
@@ -184,9 +210,11 @@ impl eframe::App for GCodeApp {
                     } else {
                         self.model.status = "Проверка...".to_string();
                         self.model.is_busy = true;
-                        let _ = self
-                            .cmd_tx
-                            .send(EditorCommand::Validate(self.model.content.clone()));
+                        let _ =
+                            self.cmd_tx
+                                .send(EditorCommand::Pipeline(PipelineCommand::Validate(
+                                    self.model.content.clone(),
+                                )));
                     }
                 }
                 super::intent::Intent::OpenFile => {
@@ -195,95 +223,46 @@ impl eframe::App for GCodeApp {
                         self.model.pending_action = Some(super::model::PendingAction::OpenNewFile);
                     } else {
                         self.model.is_busy = true;
-                        let _ = self.cmd_tx.send(EditorCommand::OpenFile);
+                        let _ = self.cmd_tx.send(EditorCommand::File(FileCommand::OpenFile));
                     }
                 }
                 super::intent::Intent::SaveFile => {
                     if self.model.file_path.is_empty() {
                         self.model.is_busy = true;
-                        let _ = self.cmd_tx.send(EditorCommand::SaveFile {
+                        let _ = self.cmd_tx.send(EditorCommand::File(FileCommand::SaveFile {
                             path: None,
                             content: self.model.content.clone(),
-                        });
+                        }));
                     } else {
                         let path = self.model.file_path.clone();
                         self.model.is_busy = true;
-                        let _ = self.cmd_tx.send(EditorCommand::SaveFile {
+                        let _ = self.cmd_tx.send(EditorCommand::File(FileCommand::SaveFile {
                             path: Some(path),
                             content: self.model.content.clone(),
-                        });
+                        }));
                     }
                 }
                 super::intent::Intent::SaveAs => {
                     self.model.is_busy = true;
-                    let _ = self.cmd_tx.send(EditorCommand::SaveFile {
+                    let _ = self.cmd_tx.send(EditorCommand::File(FileCommand::SaveFile {
                         path: None,
                         content: self.model.content.clone(),
-                    });
+                    }));
                 }
                 super::intent::Intent::ConfirmSave => {
                     self.model.show_exit_dialog = false;
-                    let action = self.model.pending_action.take();
-                    match action {
-                        Some(super::model::PendingAction::Exit) => {
-                            // Сохраняем и выходим
-                            self.model.exiting_after_save = true;
-                            if self.model.file_path.is_empty() {
-                                self.model.is_busy = true;
-                                let _ = self.cmd_tx.send(EditorCommand::SaveFile {
-                                    path: None,
-                                    content: std::mem::take(&mut self.model.content),
-                                });
-                            } else {
-                                let path = self.model.file_path.clone();
-                                let content = std::mem::take(&mut self.model.content);
-                                let _ = self.cmd_tx.send(EditorCommand::SaveFile {
-                                    path: Some(path),
-                                    content,
-                                });
-                            }
-                        }
-                        Some(super::model::PendingAction::CloseFile) => {
-                            self.model.closing_after_save = true;
-                            if self.model.file_path.is_empty() {
-                                let content = std::mem::take(&mut self.model.content);
-                                let _ = self.cmd_tx.send(EditorCommand::SaveFile {
-                                    path: None,
-                                    content,
-                                });
-                            } else {
-                                let path = self.model.file_path.clone();
-                                let content = std::mem::take(&mut self.model.content);
-                                let _ = self.cmd_tx.send(EditorCommand::SaveFile {
-                                    path: Some(path),
-                                    content,
-                                });
-                            }
-                            self.model.content.clear();
-                            self.model.file_path.clear();
-                            self.model.modified = false;
-                            self.model.status = "Файл закрыт.".to_string();
-                        }
-                        Some(super::model::PendingAction::OpenNewFile) => {
-                            if self.model.file_path.is_empty() {
-                                let content = std::mem::take(&mut self.model.content);
-                                let _ = self.cmd_tx.send(EditorCommand::SaveFile {
-                                    path: None,
-                                    content,
-                                });
-                            } else {
-                                let path = self.model.file_path.clone();
-                                let content = std::mem::take(&mut self.model.content);
-                                let _ = self.cmd_tx.send(EditorCommand::SaveFile {
-                                    path: Some(path),
-                                    content,
-                                });
-                            }
-                            self.model.is_busy = true;
-                            let _ = self.cmd_tx.send(EditorCommand::OpenFile);
-                        }
-                        None => {}
-                    }
+                    // Перемещаем ожидающее действие в save_and_exec,
+                    // чтобы выполнить его после ответа data layer
+                    self.model.save_and_exec = self.model.pending_action.take();
+                    let path = if self.model.file_path.is_empty() {
+                        None
+                    } else {
+                        Some(self.model.file_path.clone())
+                    };
+                    let content = std::mem::take(&mut self.model.content);
+                    let _ = self
+                        .cmd_tx
+                        .send(EditorCommand::File(FileCommand::SaveFile { path, content }));
                 }
                 super::intent::Intent::DiscardAndContinue => {
                     self.model.show_exit_dialog = false;
@@ -298,7 +277,7 @@ impl eframe::App for GCodeApp {
                         }
                         Some(super::model::PendingAction::OpenNewFile) => {
                             self.model.is_busy = true;
-                            let _ = self.cmd_tx.send(EditorCommand::OpenFile);
+                            let _ = self.cmd_tx.send(EditorCommand::File(FileCommand::OpenFile));
                         }
                         None => {}
                     }
@@ -323,18 +302,22 @@ impl eframe::App for GCodeApp {
         if self.awaiting_picker {
             self.awaiting_picker = false;
             let file = rfd::FileDialog::new().pick_file();
-            let _ = self.cmd_tx.send(EditorCommand::FilePickerResult {
-                path: file.map(|p| p.to_string_lossy().to_string()),
-                mode: crate::data_layer::FilePickerMode::Open,
-            });
+            let _ = self
+                .cmd_tx
+                .send(EditorCommand::Dialog(DialogCommand::FilePickerResult {
+                    path: file.map(|p| p.to_string_lossy().to_string()),
+                    mode: crate::data_layer::FilePickerMode::Open,
+                }));
         }
         if self.awaiting_save_picker {
             self.awaiting_save_picker = false;
             let file = rfd::FileDialog::new().save_file();
-            let _ = self.cmd_tx.send(EditorCommand::FilePickerResult {
-                path: file.map(|p| p.to_string_lossy().to_string()),
-                mode: crate::data_layer::FilePickerMode::Save,
-            });
+            let _ = self
+                .cmd_tx
+                .send(EditorCommand::Dialog(DialogCommand::FilePickerResult {
+                    path: file.map(|p| p.to_string_lossy().to_string()),
+                    mode: crate::data_layer::FilePickerMode::Save,
+                }));
         }
 
         // Repaint для спиннера и coalesce

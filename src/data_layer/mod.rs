@@ -10,6 +10,14 @@ use std::thread;
 /// Команда от UI к data layer.
 #[derive(Debug)]
 pub enum EditorCommand {
+    Pipeline(PipelineCommand),
+    File(FileCommand),
+    Dialog(DialogCommand),
+}
+
+/// Команды пайплайна форматирования
+#[derive(Debug)]
+pub enum PipelineCommand {
     /// Текст изменился (для дебаунса/throttle).
     TextChanged(String),
     /// Отформатировать текущий текст с заданными настройками.
@@ -20,6 +28,11 @@ pub enum EditorCommand {
     },
     /// Проверить текущий текст.
     Validate(String),
+}
+
+/// Команды работы с файлами
+#[derive(Debug)]
+pub enum FileCommand {
     /// Открыть файл.
     OpenFile,
     /// Сохранить файл.
@@ -27,6 +40,11 @@ pub enum EditorCommand {
         path: Option<String>,
         content: String,
     },
+}
+
+/// Команды диалогов UI
+#[derive(Debug)]
+pub enum DialogCommand {
     /// Результат выбора файла из диалога.
     FilePickerResult {
         path: Option<String>,
@@ -39,17 +57,37 @@ pub enum EditorCommand {
 /// Событие от data layer к UI.
 #[derive(Debug)]
 pub enum EditorEvent {
+    Pipeline(PipelineEvent),
+    File(FileEvent),
+    Dialog(DialogEvent),
+}
+
+/// События пайплайна форматирования
+#[derive(Debug)]
+pub enum PipelineEvent {
     /// Результат форматирования.
     Formatted {
         content: String,
         errors: Vec<crate::shared::ValidationMessage>,
-        /// Путь к файлу (если был открыт через FilePickerResult)
-        file_path: Option<String>,
     },
     /// Результат валидации.
     Validated {
         errors: Vec<crate::shared::ValidationMessage>,
     },
+}
+
+/// События работы с файлами
+#[derive(Debug)]
+pub enum FileEvent {
+    /// Файл загружен.
+    Loaded { content: String, file_path: String },
+    /// Файл сохранён.
+    Saved { file_path: String },
+}
+
+/// События диалогов и уведомлений
+#[derive(Debug)]
+pub enum DialogEvent {
     /// Запрос на открытие диалога выбора файла.
     RequestFilePicker { mode: FilePickerMode },
     /// Запрос на подтверждение.
@@ -89,7 +127,10 @@ pub fn spawn_data_layer() -> (mpsc::Sender<EditorCommand>, mpsc::Receiver<Editor
                 // coalesce TextChanged: если пришло несколько TextChanged подряд,
                 // оставляем только последний
                 match (&cmd, &c) {
-                    (Some(EditorCommand::TextChanged(_)), EditorCommand::TextChanged(_)) => {
+                    (
+                        Some(EditorCommand::Pipeline(PipelineCommand::TextChanged(_))),
+                        EditorCommand::Pipeline(PipelineCommand::TextChanged(_)),
+                    ) => {
                         cmd = Some(c);
                     }
                     _ => {
@@ -139,69 +180,81 @@ impl DataLayer {
 
     fn process(&mut self, cmd: &EditorCommand) {
         match cmd {
-            EditorCommand::TextChanged(_content) => {
+            EditorCommand::Pipeline(p) => self.handle_pipeline(p),
+            EditorCommand::File(f) => self.handle_file(f),
+            EditorCommand::Dialog(d) => self.handle_dialog(d),
+        }
+    }
+
+    fn handle_pipeline(&mut self, cmd: &PipelineCommand) {
+        match cmd {
+            PipelineCommand::TextChanged(_content) => {
                 // Пока ничего не делаем — форматируем только по явной команде
             }
-            EditorCommand::Format {
+            PipelineCommand::Format {
                 content,
                 renumber_step,
                 skip_empty_lines,
             } => {
-                self.send(EditorEvent::NotifyUser {
+                self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
                     message: "Форматирование...".to_string(),
                     level: NotifyLevel::Info,
-                });
+                }));
                 let result = pipeline::format_code(content, *renumber_step, *skip_empty_lines);
                 match result {
                     Ok((formatted, errors)) => {
-                        self.send(EditorEvent::Formatted {
+                        self.send(EditorEvent::Pipeline(PipelineEvent::Formatted {
                             content: formatted,
                             errors,
-                            file_path: None,
-                        });
+                        }));
                     }
                     Err(e) => {
-                        self.send(EditorEvent::NotifyUser {
+                        self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
                             message: format!("Ошибка: {}", e),
                             level: NotifyLevel::Error,
-                        });
+                        }));
                     }
                 }
-                self.send(EditorEvent::Idle);
+                self.send(EditorEvent::Dialog(DialogEvent::Idle));
             }
-            EditorCommand::Validate(content) => {
-                self.send(EditorEvent::NotifyUser {
+            PipelineCommand::Validate(content) => {
+                self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
                     message: "Проверка...".to_string(),
                     level: NotifyLevel::Info,
-                });
+                }));
                 let result = pipeline::validate_code(content);
                 match result {
                     Ok(errors) => {
-                        self.send(EditorEvent::Validated { errors });
+                        self.send(EditorEvent::Pipeline(PipelineEvent::Validated { errors }));
                     }
                     Err(e) => {
-                        self.send(EditorEvent::NotifyUser {
+                        self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
                             message: format!("Ошибка: {}", e),
                             level: NotifyLevel::Error,
-                        });
+                        }));
                     }
                 }
-                self.send(EditorEvent::Idle);
+                self.send(EditorEvent::Dialog(DialogEvent::Idle));
             }
-            EditorCommand::OpenFile => {
-                self.send(EditorEvent::RequestFilePicker {
+        }
+    }
+
+    fn handle_file(&mut self, cmd: &FileCommand) {
+        match cmd {
+            FileCommand::OpenFile => {
+                self.send(EditorEvent::Dialog(DialogEvent::RequestFilePicker {
                     mode: FilePickerMode::Open,
-                });
+                }));
                 self.pending_file_picker = true;
             }
-            EditorCommand::SaveFile { path, content } => {
+            FileCommand::SaveFile { path, content } => {
                 let file_path = match path {
                     Some(p) => p.clone(),
                     None => {
                         self.pending_save_content = Some(content.clone());
-                        self.send(EditorEvent::RequestFilePicker {
+                        self.send(EditorEvent::Dialog(DialogEvent::RequestFilePicker {
                             mode: FilePickerMode::Save,
-                        });
+                        }));
                         self.pending_file_picker = true;
                         return;
                     }
@@ -209,27 +262,29 @@ impl DataLayer {
                 self.current_file_path = Some(file_path.clone());
                 match std::fs::write(&file_path, content) {
                     Ok(_) => {
-                        self.send(EditorEvent::NotifyUser {
+                        self.send(EditorEvent::File(FileEvent::Saved {
+                            file_path: file_path.clone(),
+                        }));
+                        self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
                             message: format!("Сохранено: {}", file_path),
                             level: NotifyLevel::Info,
-                        });
-                        // Отправляем Formatted с file_path, чтобы UI обновил путь
-                        self.send(EditorEvent::Formatted {
-                            content: String::new(),
-                            errors: vec![],
-                            file_path: Some(file_path.clone()),
-                        });
+                        }));
                     }
                     Err(e) => {
-                        self.send(EditorEvent::NotifyUser {
+                        self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
                             message: format!("Ошибка сохранения: {}", e),
                             level: NotifyLevel::Error,
-                        });
+                        }));
                     }
                 }
-                self.send(EditorEvent::Idle);
+                self.send(EditorEvent::Dialog(DialogEvent::Idle));
             }
-            EditorCommand::FilePickerResult { path, mode } => {
+        }
+    }
+
+    fn handle_dialog(&mut self, cmd: &DialogCommand) {
+        match cmd {
+            DialogCommand::FilePickerResult { path, mode } => {
                 self.pending_file_picker = false;
                 match mode {
                     FilePickerMode::Open => {
@@ -242,21 +297,20 @@ impl DataLayer {
                                         .replace("\r", "\n")
                                         .trim_start_matches('\u{feff}')
                                         .to_string();
-                                    self.send(EditorEvent::Formatted {
+                                    self.send(EditorEvent::File(FileEvent::Loaded {
                                         content,
-                                        errors: vec![],
-                                        file_path: Some(path.clone()),
-                                    });
+                                        file_path: path.clone(),
+                                    }));
                                 }
                                 Err(e) => {
-                                    self.send(EditorEvent::NotifyUser {
+                                    self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
                                         message: format!("Ошибка: {}", e),
                                         level: NotifyLevel::Error,
-                                    });
+                                    }));
                                 }
                             }
                         }
-                        self.send(EditorEvent::Idle);
+                        self.send(EditorEvent::Dialog(DialogEvent::Idle));
                     }
                     FilePickerMode::Save => {
                         if let Some(path) = path {
@@ -264,30 +318,28 @@ impl DataLayer {
                             let content = self.pending_save_content.take().unwrap_or_default();
                             match std::fs::write(&path, &content) {
                                 Ok(_) => {
-                                    self.send(EditorEvent::NotifyUser {
+                                    self.send(EditorEvent::File(FileEvent::Saved {
+                                        file_path: path.clone(),
+                                    }));
+                                    self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
                                         message: format!("Сохранено: {}", path),
                                         level: NotifyLevel::Info,
-                                    });
-                                    self.send(EditorEvent::Formatted {
-                                        content: String::new(),
-                                        errors: vec![],
-                                        file_path: Some(path.clone()),
-                                    });
+                                    }));
                                 }
                                 Err(e) => {
-                                    self.send(EditorEvent::NotifyUser {
+                                    self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
                                         message: format!("Ошибка сохранения: {}", e),
                                         level: NotifyLevel::Error,
-                                    });
+                                    }));
                                 }
                             }
                         }
                         self.pending_save_content = None;
-                        self.send(EditorEvent::Idle);
+                        self.send(EditorEvent::Dialog(DialogEvent::Idle));
                     }
                 }
             }
-            EditorCommand::DialogResult { confirmed: _ } => {
+            DialogCommand::DialogResult { confirmed: _ } => {
                 self.pending_dialog = false;
                 // Результат диалога обрабатывается в UI
             }
