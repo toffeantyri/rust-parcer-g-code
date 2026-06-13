@@ -9,15 +9,10 @@ description = "A parser and formatter library in Rust"
 name = "code_parser"
 
 [[bin]]
-name = "parser_cli"
-path = "src/bin/main.rs"
-
-[[bin]]
 name = "editor"
 path = "src/bin/gui_main.rs"
 
 [dependencies]
-anyhow = "1.0"
 thiserror = "2.0"
 rfd = "0.15"
 
@@ -31,3 +26,7 @@ serde_json = "1.0"
 serde_yaml = "0.9"
 
 [build-dependencies]
+
+[dev-dependencies]
+tempfile = "3.0"
+egui_kittest = { version = "0.31", features = ["eframe"] }

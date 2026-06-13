@@ -91,6 +91,7 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &Model) -> Vec
             });
             ui.menu_button(&i18n::locale().menu.help, |ui| {
                 if ui.button(&i18n::locale().menu.shortcuts).clicked() {
+                    intents.push(Intent::ToggleShortcuts);
                     ui.close_menu();
                 }
                 ui.separator();
@@ -279,6 +280,54 @@ pub fn view_exit_dialog(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
     // Если закрыли крестиком — считаем отменой
     if !is_open && model.show_exit_dialog {
         intents.push(Intent::CancelAction);
+    }
+
+    intents
+}
+
+/// Отрисовывает окно горячих клавиш.
+pub fn view_shortcuts(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
+    let mut intents = Vec::new();
+    if !model.shortcuts_open {
+        return intents;
+    }
+
+    let mut open_copy = true;
+    egui::Window::new("⌨ ".to_string() + &i18n::locale().menu.shortcuts)
+        .open(&mut open_copy)
+        .resizable(false)
+        .default_size([420.0, 300.0])
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .show(ctx, |ui| {
+            use egui::RichText;
+
+            let shortcuts = [
+                ("Ctrl+O", &i18n::locale().menu.open),
+                ("Ctrl+S", &i18n::locale().menu.save),
+                ("Ctrl+Shift+S", &i18n::locale().menu.save_as),
+                ("F5", &i18n::locale().menu.format),
+                ("F6", &i18n::locale().menu.validate),
+            ];
+
+            ui.label(
+                RichText::new(&i18n::locale().menu.shortcuts_title)
+                    .size(16.0)
+                    .strong(),
+            );
+            ui.separator();
+            ui.add_space(8.0);
+
+            for (key, desc) in &shortcuts {
+                ui.horizontal(|ui| {
+                    ui.monospace(*key);
+                    ui.label("  —  ");
+                    ui.label(*desc);
+                });
+            }
+        });
+
+    if !open_copy {
+        intents.push(Intent::ToggleShortcuts);
     }
 
     intents

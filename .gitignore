@@ -27,3 +27,5 @@ Cargo.lock
 # SSH keys accidentally placed in project root
 *_key
 *_key.pub
+**/tests/snapshots/**/*.diff.png
+**/tests/snapshots/**/*.new.png

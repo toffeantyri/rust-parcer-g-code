@@ -93,4 +93,34 @@ mod tests {
         assert_eq!(axis.to_string(), "X10.5");
         assert_eq!(comment.to_string(), ";Test move");
     }
+
+    #[test]
+    fn test_statement_display_all_variants() {
+        let motion = Statement::Motion(MotionStatement {
+            code: 1,
+            rapid: false,
+        });
+        assert_eq!(motion.to_string(), "G1");
+
+        let ncode = Statement::NCode(105);
+        assert_eq!(ncode.to_string(), "N0105");
+
+        let word = Statement::Word("MODECHECK(2)".to_string());
+        assert_eq!(word.to_string(), "MODECHECK(2)");
+
+        let misc = Statement::Misc(MiscStatement { code: 3 });
+        assert_eq!(misc.to_string(), "M3");
+
+        let axis_none = Statement::Axis(AxisStatement {
+            axis: "X".to_string(),
+            value: None,
+        });
+        assert_eq!(axis_none.to_string(), "X");
+
+        let raw = Statement::Raw("CFTCP".to_string());
+        assert_eq!(raw.to_string(), "CFTCP");
+
+        let newline = Statement::NewLine;
+        assert_eq!(newline.to_string(), "\n");
+    }
 }
