@@ -28,7 +28,7 @@ pub struct Model {
 }
 
 /// Действие, ожидающее подтверждения пользователя
-#[derive(Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum PendingAction {
     Exit,
     CloseFile,
