@@ -274,6 +274,25 @@ impl eframe::App for GCodeApp {
             self.handle_event(event);
         }
 
+        // === Горячие клавиши ===
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::F5)) {
+            self.handle_intent(&Intent::Format);
+        }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::F6)) {
+            self.handle_intent(&Intent::Validate);
+        }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::O)) {
+            self.handle_intent(&Intent::OpenFile);
+        }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::S)) {
+            let shift = ctx.input(|i| i.modifiers.shift);
+            if shift {
+                self.handle_intent(&Intent::SaveAs);
+            } else {
+                self.handle_intent(&Intent::SaveFile);
+            }
+        }
+
         // === Coalesce: отправляем TextChanged, если прошло 100 мс с последнего изменения ===
         if self.pending_text.is_some()
             && self.last_text_change.elapsed() >= std::time::Duration::from_millis(100)
