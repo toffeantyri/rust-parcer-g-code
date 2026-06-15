@@ -29,3 +29,4 @@ Cargo.lock
 *_key.pub
 **/tests/snapshots/**/*.diff.png
 **/tests/snapshots/**/*.new.png
+.config/gcode-editor/
