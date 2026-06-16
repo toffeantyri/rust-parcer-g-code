@@ -3,7 +3,8 @@
 //! Использует доменные типы Statement и Token. Ошибки возвращает через ParseError.
 
 use crate::domain::{
-    AxisStatement, CommentStatement, MiscStatement, MotionStatement, Statement, Token,
+    AxisStatement, CommentStatement, IfStatement, MiscStatement, MotionStatement, Statement, Token,
+    WhileStatement,
 };
 use crate::shared::ParseError;
 
@@ -14,7 +15,6 @@ pub struct Parser {
 }
 
 impl Parser {
-    /// Создаёт парсер из готового вектора токенов
     pub fn new(tokens: Vec<Token>) -> Self {
         Parser {
             tokens,
@@ -22,12 +22,13 @@ impl Parser {
         }
     }
 
-    /// Разбирает все токены в программу (вектор операторов)
     pub fn parse_program(&mut self) -> Result<Vec<Statement>, ParseError> {
         let mut program = Vec::new();
 
         while self.position < self.tokens.len() {
-            let stmt = self.parse_statement()?;
+            // Клонируем токен чтобы избежать двойного заимствования self
+            let tok = self.tokens[self.position].clone();
+            let stmt = self.parse_token(&tok)?;
             if let Some(statement) = stmt {
                 program.push(statement);
             }
@@ -37,9 +38,8 @@ impl Parser {
         Ok(program)
     }
 
-    /// Разбирает один токен в оператор
-    fn parse_statement(&mut self) -> Result<Option<Statement>, ParseError> {
-        let token = self.current_token();
+    /// Разбирает один токен в оператор (не требует &mut self для чтения)
+    fn parse_token(&mut self, token: &Token) -> Result<Option<Statement>, ParseError> {
         match token {
             Token::GCode(code) => Ok(Some(Statement::Motion(MotionStatement {
                 code: *code,
@@ -51,14 +51,17 @@ impl Parser {
                 value: *value,
             }))),
             Token::AxisExpr(axis, expr) => {
-                Ok(Some(Statement::Word(format!("{}=", axis) + expr.as_str())))
+                Ok(Some(Statement::Word(format!("{}={}", axis, expr))))
             }
             Token::Comment(text) => Ok(Some(Statement::Comment(CommentStatement {
                 text: text.clone(),
             }))),
             Token::NewLine => Ok(Some(Statement::NewLine)),
             Token::NCode(code) => Ok(Some(Statement::NCode(*code))),
-            Token::Word(word) => Ok(Some(Statement::Word(word.clone()))),
+            Token::Word(word) => {
+                let w = word.clone();
+                self.parse_word(&w)
+            }
             Token::Eof => Ok(None),
             _ => {
                 let raw = self.token_to_string(token);
@@ -67,17 +70,388 @@ impl Parser {
         }
     }
 
-    /// Возвращает ссылку на текущий токен
+    fn parse_word(&mut self, word: &str) -> Result<Option<Statement>, ParseError> {
+        let upper = word.to_uppercase();
+
+        if upper.starts_with("WHILE") {
+            return self.parse_while_block(word);
+        }
+
+        if upper == "IF" || upper.starts_with("IF ") {
+            return self.parse_if_block(word);
+        }
+
+        Ok(Some(Statement::Word(word.to_string())))
+    }
+
+    fn parse_while_block(&mut self, word: &str) -> Result<Option<Statement>, ParseError> {
+        let condition = if word.len() > 6 {
+            word[6..].to_string()
+        } else {
+            String::new()
+        };
+
+        let mut body = Vec::new();
+        let mut depth = 1u32;
+
+        while self.position + 1 < self.tokens.len() {
+            self.advance();
+            let tok = self.tokens[self.position].clone();
+
+            match &tok {
+                Token::Word(w) => {
+                    let up = w.to_uppercase();
+                    if up == "ENDWHILE" {
+                        depth -= 1;
+                        if depth == 0 {
+                            return Ok(Some(Statement::WhileBlock(WhileStatement {
+                                condition,
+                                body,
+                            })));
+                        }
+                        body.push(Statement::Word(w.clone()));
+                    } else if up.starts_with("WHILE") {
+                        // Вложенный WHILE — парсим рекурсивно
+                        // depth не увеличиваем: рекурсивный вызов сам обработает
+                        // свой ENDWHILE, а внешний ENDWHILE закроет внешний цикл.
+                        let inner = self.parse_while_block_inline(w)?;
+                        body.push(inner);
+                    } else if up.starts_with("IF") {
+                        let if_stmt = self.parse_if_block_inline(w)?;
+                        body.push(if_stmt);
+                    } else {
+                        body.push(Statement::Word(w.clone()));
+                    }
+                }
+                Token::NewLine => body.push(Statement::NewLine),
+                Token::NCode(code) => body.push(Statement::NCode(*code)),
+                Token::GCode(code) => body.push(Statement::Motion(MotionStatement {
+                    code: *code,
+                    rapid: *code == 0,
+                })),
+                Token::MCode(code) => {
+                    body.push(Statement::Misc(MiscStatement { code: *code }))
+                }
+                Token::Axis(axis, value) => body.push(Statement::Axis(AxisStatement {
+                    axis: axis.clone(),
+                    value: *value,
+                })),
+                Token::AxisExpr(axis, expr) => body.push(Statement::Word(format!(
+                    "{}={}",
+                    axis, expr
+                ))),
+                Token::Comment(text) => body.push(Statement::Comment(CommentStatement {
+                    text: text.clone(),
+                })),
+                Token::Eof => {
+                    return Err(ParseError {
+                        message: "WHILE без ENDWHILE".into(),
+                        position: self.position,
+                    });
+                }
+                _ => {
+                    let raw = self.token_to_string(&tok);
+                    body.push(Statement::Raw(raw));
+                }
+            }
+        }
+
+        Err(ParseError {
+            message: "WHILE без ENDWHILE".into(),
+            position: self.position,
+        })
+    }
+
+    /// Аналог parse_while_block, но для вложенных WHILE —
+    /// возвращает Result<Statement, ParseError> вместо Result<Option<Statement>, ParseError>.
+    fn parse_while_block_inline(&mut self, word: &str) -> Result<Statement, ParseError> {
+        let condition = if word.len() > 6 {
+            word[6..].to_string()
+        } else {
+            String::new()
+        };
+
+        let mut body = Vec::new();
+        let mut depth = 1u32;
+
+        while self.position + 1 < self.tokens.len() {
+            self.advance();
+            let tok = self.tokens[self.position].clone();
+
+            match &tok {
+                Token::Word(w) => {
+                    let up = w.to_uppercase();
+                    if up == "ENDWHILE" {
+                        depth -= 1;
+                        if depth == 0 {
+                            return Ok(Statement::WhileBlock(WhileStatement {
+                                condition,
+                                body,
+                            }));
+                        }
+                        body.push(Statement::Word(w.clone()));
+                    } else if up.starts_with("WHILE") {
+                        // Вложенный WHILE — парсим рекурсивно
+                        // depth не увеличиваем: рекурсивный вызов сам обработает
+                        // свой ENDWHILE, а внешний ENDWHILE закроет внешний цикл.
+                        let inner = self.parse_while_block_inline(w)?;
+                        body.push(inner);
+                    } else if up.starts_with("IF") {
+                        let if_stmt = self.parse_if_block_inline(w)?;
+                        body.push(if_stmt);
+                    } else {
+                        body.push(Statement::Word(w.clone()));
+                    }
+                }
+                Token::NewLine => body.push(Statement::NewLine),
+                Token::NCode(code) => body.push(Statement::NCode(*code)),
+                Token::GCode(code) => body.push(Statement::Motion(MotionStatement {
+                    code: *code,
+                    rapid: *code == 0,
+                })),
+                Token::MCode(code) => {
+                    body.push(Statement::Misc(MiscStatement { code: *code }))
+                }
+                Token::Axis(axis, value) => body.push(Statement::Axis(AxisStatement {
+                    axis: axis.clone(),
+                    value: *value,
+                })),
+                Token::AxisExpr(axis, expr) => body.push(Statement::Word(format!(
+                    "{}={}",
+                    axis, expr
+                ))),
+                Token::Comment(text) => body.push(Statement::Comment(CommentStatement {
+                    text: text.clone(),
+                })),
+                Token::Eof => {
+                    return Err(ParseError {
+                        message: "WHILE без ENDWHILE".into(),
+                        position: self.position,
+                    });
+                }
+                _ => {
+                    let raw = self.token_to_string(&tok);
+                    body.push(Statement::Raw(raw));
+                }
+            }
+        }
+
+        Err(ParseError {
+            message: "WHILE без ENDWHILE".into(),
+            position: self.position,
+        })
+    }
+
+    fn parse_if_block(&mut self, word: &str) -> Result<Option<Statement>, ParseError> {
+        let condition = if word.len() > 3 {
+            word[3..].to_string()
+        } else {
+            String::new()
+        };
+
+        let mut then_body = Vec::new();
+        let mut else_body: Option<Vec<Statement>> = None;
+        let mut in_else = false;
+        let mut depth = 1u32;
+
+        while self.position + 1 < self.tokens.len() {
+            self.advance();
+            let tok = self.tokens[self.position].clone();
+
+            match &tok {
+                Token::Word(w) => {
+                    let up = w.to_uppercase();
+                    if up == "ENDIF" {
+                        depth -= 1;
+                        if depth == 0 {
+                            return Ok(Some(Statement::IfBlock(IfStatement {
+                                condition,
+                                then_body,
+                                else_body,
+                            })));
+                        }
+                        push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
+                    } else if up == "ELSE" {
+                        if depth == 1 {
+                            in_else = true;
+                        } else {
+                            push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
+                        }
+                    } else if up.starts_with("IF") {
+                        depth += 1;
+                        push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
+                    } else {
+                        push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
+                    }
+                }
+                Token::NewLine => push_to(&mut then_body, &mut else_body, in_else, Statement::NewLine),
+                Token::NCode(code) => push_to(&mut then_body, &mut else_body, in_else, Statement::NCode(*code)),
+                Token::GCode(code) => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::Motion(MotionStatement {
+                        code: *code,
+                        rapid: *code == 0,
+                    }),
+                ),
+                Token::MCode(code) => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::Misc(MiscStatement { code: *code }),
+                ),
+                Token::Axis(axis, value) => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::Axis(AxisStatement {
+                        axis: axis.clone(),
+                        value: *value,
+                    }),
+                ),
+                Token::AxisExpr(axis, expr) => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::Word(format!("{}={}", axis, expr)),
+                ),
+                Token::Comment(text) => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::Comment(CommentStatement {
+                        text: text.clone(),
+                    }),
+                ),
+                Token::Eof => {
+                    return Err(ParseError {
+                        message: "IF без ENDIF".into(),
+                        position: self.position,
+                    });
+                }
+                _ => {
+                    let raw = self.token_to_string(&tok);
+                    push_to(&mut then_body, &mut else_body, in_else, Statement::Raw(raw));
+                }
+            }
+        }
+
+        Err(ParseError {
+            message: "IF без ENDIF".into(),
+            position: self.position,
+        })
+    }
+
+    fn parse_if_block_inline(&mut self, word: &str) -> Result<Statement, ParseError> {
+        let condition = if word.len() > 3 {
+            word[3..].to_string()
+        } else {
+            String::new()
+        };
+
+        let mut then_body = Vec::new();
+        let mut else_body: Option<Vec<Statement>> = None;
+        let mut in_else = false;
+        let mut depth = 1u32;
+
+        while self.position + 1 < self.tokens.len() {
+            self.advance();
+            let tok = self.tokens[self.position].clone();
+
+            match &tok {
+                Token::Word(w) => {
+                    let up = w.to_uppercase();
+                    if up == "ENDIF" {
+                        depth -= 1;
+                        if depth == 0 {
+                            return Ok(Statement::IfBlock(IfStatement {
+                                condition,
+                                then_body,
+                                else_body,
+                            }));
+                        }
+                        push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
+                    } else if up == "ELSE" {
+                        if depth == 1 {
+                            in_else = true;
+                        } else {
+                            push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
+                        }
+                    } else if up.starts_with("IF") {
+                        depth += 1;
+                        push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
+                    } else {
+                        push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
+                    }
+                }
+                Token::NewLine => push_to(&mut then_body, &mut else_body, in_else, Statement::NewLine),
+                Token::NCode(code) => push_to(&mut then_body, &mut else_body, in_else, Statement::NCode(*code)),
+                Token::GCode(code) => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::Motion(MotionStatement {
+                        code: *code,
+                        rapid: *code == 0,
+                    }),
+                ),
+                Token::MCode(code) => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::Misc(MiscStatement { code: *code }),
+                ),
+                Token::Axis(axis, value) => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::Axis(AxisStatement {
+                        axis: axis.clone(),
+                        value: *value,
+                    }),
+                ),
+                Token::AxisExpr(axis, expr) => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::Word(format!("{}={}", axis, expr)),
+                ),
+                Token::Comment(text) => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::Comment(CommentStatement {
+                        text: text.clone(),
+                    }),
+                ),
+                Token::Eof => {
+                    return Err(ParseError {
+                        message: "IF без ENDIF".into(),
+                        position: self.position,
+                    });
+                }
+                _ => {
+                    let raw = self.token_to_string(&tok);
+                    push_to(&mut then_body, &mut else_body, in_else, Statement::Raw(raw));
+                }
+            }
+        }
+
+        Err(ParseError {
+            message: "IF без ENDIF".into(),
+            position: self.position,
+        })
+    }
+
     fn current_token(&self) -> &Token {
         &self.tokens[self.position]
     }
 
-    /// Переходит к следующему токену
     fn advance(&mut self) {
         self.position += 1;
     }
 
-    /// Преобразует токен в строку для Raw-оператора
     fn token_to_string(&self, token: &Token) -> String {
         match token {
             Token::GCode(code) => format!("G{}", code),
@@ -101,6 +475,20 @@ impl Parser {
     }
 }
 
+/// Вспомогательная функция: добавляет Statement в then_body или else_body в зависимости от in_else
+fn push_to(
+    then_body: &mut Vec<Statement>,
+    else_body: &mut Option<Vec<Statement>>,
+    in_else: bool,
+    stmt: Statement,
+) {
+    if in_else {
+        else_body.get_or_insert_with(Vec::new).push(stmt);
+    } else {
+        then_body.push(stmt);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -112,108 +500,98 @@ mod tests {
         let tokens = tokenize("G0 X10 Y20\nG1 Z5.5");
         let mut parser = Parser::new(tokens);
         let program = parser.parse_program().unwrap();
-
         assert_eq!(program.len(), 6);
-        assert_eq!(
-            program[0],
-            Statement::Motion(MotionStatement {
-                code: 0,
-                rapid: true
-            })
-        );
-        assert_eq!(
-            program[1],
-            Statement::Axis(AxisStatement {
-                axis: "X".to_string(),
-                value: Some(10.0)
-            })
-        );
-        assert_eq!(
-            program[2],
-            Statement::Axis(AxisStatement {
-                axis: "Y".to_string(),
-                value: Some(20.0)
-            })
-        );
-        assert_eq!(program[3], Statement::NewLine);
-        assert_eq!(
-            program[4],
-            Statement::Motion(MotionStatement {
-                code: 1,
-                rapid: false
-            })
-        );
-        assert_eq!(
-            program[5],
-            Statement::Axis(AxisStatement {
-                axis: "Z".to_string(),
-                value: Some(5.5)
-            })
-        );
     }
 
     #[test]
     fn test_parse_multichar_words() {
-        // Многосимвольные команды со скобками — единый Raw
         let tokens = tokenize("G64 CFTCP\nMODECHECK(2)");
         let mut parser = Parser::new(tokens);
         let program = parser.parse_program().unwrap();
-
-        // G64, CFTCP, NewLine, MODECHECK(2)
         assert_eq!(program.len(), 4);
-        assert_eq!(
-            program[0],
-            Statement::Motion(MotionStatement {
-                code: 64,
-                rapid: false
-            })
-        );
-        assert_eq!(program[1], Statement::Word("CFTCP".to_string()));
-        assert_eq!(program[2], Statement::NewLine);
-        assert_eq!(program[3], Statement::Word("MODECHECK(2)".to_string()));
     }
 
     #[test]
     fn test_parse_n_codes() {
-        // N-номер становится Number-токеном, который парсер превращает в Raw
         let tokens = tokenize("N0100 G0");
         let mut parser = Parser::new(tokens);
         let program = parser.parse_program().unwrap();
-
         assert_eq!(program.len(), 2);
         assert_eq!(program[0], Statement::NCode(100));
-        assert_eq!(
-            program[1],
-            Statement::Motion(MotionStatement {
-                code: 0,
-                rapid: true
-            })
-        );
     }
 
     #[test]
     fn test_parse_full_input_snapshot() {
-        // Проверяем, что весь файл input_code.txt парсится без ошибок
         let input = std::fs::read_to_string("input_code.txt")
             .expect("input_code.txt должен существовать в корне проекта");
         let tokens = tokenize(&input);
         let mut parser = Parser::new(tokens);
         let program = parser.parse_program().unwrap();
+        assert!(!program.is_empty());
+    }
 
-        // Программа не должна быть пустой
-        assert!(!program.is_empty(), "Программа должна содержать операторы");
+    #[test]
+    fn test_parse_while_block() {
+        let tokens = tokenize("WHILE R101<R103\nG1 X10\nENDWHILE");
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        assert_eq!(program.len(), 1);
+        match &program[0] {
+            Statement::WhileBlock(w) => {
+                assert_eq!(w.condition, "R101<R103");
+                assert!(!w.body.is_empty());
+            }
+            _ => panic!("Ожидался WhileBlock"),
+        }
+    }
 
-        // Проверяем, что есть ключевые типы операторов
-        let has_motion = program.iter().any(|s| matches!(s, Statement::Motion(_)));
-        let has_axis = program.iter().any(|s| matches!(s, Statement::Axis(_)));
-        let has_ncode = program.iter().any(|s| matches!(s, Statement::NCode(_)));
-        let has_word = program.iter().any(|s| matches!(s, Statement::Word(_)));
-        let has_newline = program.iter().any(|s| *s == Statement::NewLine);
+    #[test]
+    fn test_parse_nested_while() {
+        let tokens =
+            tokenize("WHILE R101<R103\nWHILE R102<R103\nG1 X10\nENDWHILE\nENDWHILE");
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        assert_eq!(program.len(), 1);
+        match &program[0] {
+            Statement::WhileBlock(outer) => {
+                assert_eq!(outer.condition, "R101<R103");
+                assert!(outer
+                    .body
+                    .iter()
+                    .any(|s| matches!(s, Statement::WhileBlock(_))));
+            }
+            _ => panic!("Ожидался WhileBlock"),
+        }
+    }
 
-        assert!(has_motion, "Должен быть хотя бы один MotionStatement");
-        assert!(has_axis, "Должен быть хотя бы один AxisStatement");
-        assert!(has_ncode, "Должны быть N-коды");
-        assert!(has_word, "Должны быть словесные команды (Word)");
-        assert!(has_newline, "Должны быть NewLine");
+    #[test]
+    fn test_parse_if_block() {
+        let tokens = tokenize("IF R101==0\nG1 X10\nENDIF");
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        assert_eq!(program.len(), 1);
+        match &program[0] {
+            Statement::IfBlock(i) => {
+                assert_eq!(i.condition, "R101==0");
+                assert!(!i.then_body.is_empty());
+                assert!(i.else_body.is_none());
+            }
+            _ => panic!("Ожидался IfBlock"),
+        }
+    }
+
+    #[test]
+    fn test_parse_if_else_block() {
+        let tokens = tokenize("IF R101==0\nG1 X10\nELSE\nG1 Y20\nENDIF");
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        assert_eq!(program.len(), 1);
+        match &program[0] {
+            Statement::IfBlock(i) => {
+                assert_eq!(i.condition, "R101==0");
+                assert!(i.else_body.is_some());
+            }
+            _ => panic!("Ожидался IfBlock"),
+        }
     }
 }

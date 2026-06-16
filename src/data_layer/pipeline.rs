@@ -156,4 +156,33 @@ mod tests {
         let has_axis_errors = errors.iter().any(|e| e.severity == Severity::Error);
         assert!(!has_axis_errors);
     }
+
+    #[test]
+    fn test_format_text_params() {
+        let path = "text_params.txt";
+        let input = std::fs::read_to_string(path).expect("Не удалось прочитать text_params.txt");
+        let result = format_code(&input, 0, true);
+        assert!(result.is_ok(), "format_code вернул ошибку: {:?}", result.err());
+        let (formatted, warnings) = result.unwrap();
+
+        println!("=== FORMATTED OUTPUT ===");
+        println!("{}", formatted);
+        println!("=== END ===");
+        if !warnings.is_empty() {
+            println!("Warnings ({}) :", warnings.len());
+            for w in &warnings {
+                println!("  [{:?}] {}", w.severity, w.message);
+            }
+        }
+
+        assert!(!formatted.is_empty(), "Результат форматирования пуст");
+        assert!(
+            formatted.contains("WHILE"),
+            "Результат не содержит WHILE"
+        );
+        assert!(
+            formatted.contains("ENDWHILE"),
+            "Результат не содержит ENDWHILE"
+        );
+    }
 }
