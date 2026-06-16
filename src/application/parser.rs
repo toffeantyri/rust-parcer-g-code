@@ -278,8 +278,11 @@ impl Parser {
                             push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
                         }
                     } else if up.starts_with("IF") {
-                        depth += 1;
-                        push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
+                        let inner = self.parse_if_block_inline(w)?;
+                        push_to(&mut then_body, &mut else_body, in_else, inner);
+                    } else if up.starts_with("WHILE") {
+                        let inner = self.parse_while_block_inline(w)?;
+                        push_to(&mut then_body, &mut else_body, in_else, inner);
                     } else {
                         push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
                     }
@@ -379,8 +382,11 @@ impl Parser {
                             push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
                         }
                     } else if up.starts_with("IF") {
-                        depth += 1;
-                        push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
+                        let inner = self.parse_if_block_inline(w)?;
+                        push_to(&mut then_body, &mut else_body, in_else, inner);
+                    } else if up.starts_with("WHILE") {
+                        let inner = self.parse_while_block_inline(w)?;
+                        push_to(&mut then_body, &mut else_body, in_else, inner);
                     } else {
                         push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
                     }
@@ -590,6 +596,66 @@ mod tests {
             Statement::IfBlock(i) => {
                 assert_eq!(i.condition, "R101==0");
                 assert!(i.else_body.is_some());
+            }
+            _ => panic!("Ожидался IfBlock"),
+        }
+    }
+
+    #[test]
+    fn test_parse_while_with_inner_if() {
+        let tokens = tokenize("WHILE R101<R103\nIF R102==0\nG1 X10\nENDIF\nENDWHILE");
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        assert_eq!(program.len(), 1);
+        match &program[0] {
+            Statement::WhileBlock(w) => {
+                assert_eq!(w.condition, "R101<R103");
+                assert!(w.body.iter().any(|s| matches!(s, Statement::IfBlock(_))));
+            }
+            _ => panic!("Ожидался WhileBlock"),
+        }
+    }
+
+    #[test]
+    fn test_parse_if_with_empty_else() {
+        let tokens = tokenize("IF R101==0\nG1 X10\nELSE\nENDIF");
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        assert_eq!(program.len(), 1);
+        match &program[0] {
+            Statement::IfBlock(i) => {
+                assert_eq!(i.condition, "R101==0");
+                assert!(i.else_body.is_some());
+            }
+            _ => panic!("Ожидался IfBlock"),
+        }
+    }
+
+    #[test]
+    fn test_parse_if_with_inner_while() {
+        let tokens = tokenize("IF R101==0\nWHILE R102<R103\nG1 X10\nENDWHILE\nENDIF");
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        assert_eq!(program.len(), 1);
+        match &program[0] {
+            Statement::IfBlock(i) => {
+                assert_eq!(i.condition, "R101==0");
+                assert!(i.then_body.iter().any(|s| matches!(s, Statement::WhileBlock(_))));
+            }
+            _ => panic!("Ожидался IfBlock"),
+        }
+    }
+
+    #[test]
+    fn test_parse_nested_if() {
+        let tokens = tokenize("IF R101>0\nIF R102>0\nG1 X10\nENDIF\nENDIF");
+        let mut parser = Parser::new(tokens);
+        let program = parser.parse_program().unwrap();
+        assert_eq!(program.len(), 1);
+        match &program[0] {
+            Statement::IfBlock(outer) => {
+                assert_eq!(outer.condition, "R101>0");
+                assert!(outer.then_body.iter().any(|s| matches!(s, Statement::IfBlock(_))));
             }
             _ => panic!("Ожидался IfBlock"),
         }

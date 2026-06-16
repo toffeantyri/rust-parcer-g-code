@@ -453,4 +453,76 @@ mod tests {
         assert!(result.contains("  ENDWHILE\n"));
         assert!(result.contains("ENDWHILE\n"));
     }
+
+    #[test]
+    fn test_format_if_without_else() {
+        let program = vec![Statement::IfBlock(IfStatement {
+            condition: "R101==0".into(),
+            then_body: vec![
+                Statement::Motion(MotionStatement { code: 0, rapid: true }),
+                Statement::NewLine,
+            ],
+            else_body: None,
+        })];
+        let formatter = Formatter::new(FormatConfig::default());
+        let result = formatter.format_program(&program);
+        assert!(result.contains("IF R101==0\n"));
+        assert!(result.contains("  G0\n"));
+        assert!(result.contains("ENDIF\n"));
+        assert!(!result.contains("ELSE"));
+    }
+
+    #[test]
+    fn test_format_nested_if() {
+        let program = vec![Statement::IfBlock(IfStatement {
+            condition: "R101>0".into(),
+            then_body: vec![
+                Statement::IfBlock(IfStatement {
+                    condition: "R102>0".into(),
+                    then_body: vec![
+                        Statement::Motion(MotionStatement { code: 1, rapid: false }),
+                        Statement::NewLine,
+                    ],
+                    else_body: None,
+                }),
+                Statement::NewLine,
+            ],
+            else_body: None,
+        })];
+        let formatter = Formatter::new(FormatConfig::default());
+        let result = formatter.format_program(&program);
+        assert!(result.contains("IF R101>0\n"));
+        assert!(result.contains("  IF R102>0\n"));
+        assert!(result.contains("    G1\n"));
+        assert!(result.contains("  ENDIF\n"));
+        assert!(result.contains("ENDIF\n"));
+    }
+
+    #[test]
+    fn test_format_with_tabs() {
+        let program = vec![Statement::WhileBlock(WhileStatement {
+            condition: "R101<R103".into(),
+            body: vec![
+                Statement::Motion(MotionStatement { code: 1, rapid: false }),
+                Statement::NewLine,
+            ],
+        })];
+        let config = FormatConfig { use_spaces: false, indent_size: 2, ..Default::default() };
+        let formatter = Formatter::new(config);
+        let result = formatter.format_program(&program);
+        assert!(result.contains("WHILE R101<R103\n"));
+        assert!(result.contains("\tG1\n"));
+        assert!(result.contains("ENDWHILE\n"));
+    }
+
+    #[test]
+    fn test_format_empty_while() {
+        let program = vec![Statement::WhileBlock(WhileStatement {
+            condition: "TRUE".into(),
+            body: vec![],
+        })];
+        let formatter = Formatter::new(FormatConfig::default());
+        let result = formatter.format_program(&program);
+        assert_eq!(result, "WHILE TRUE\nENDWHILE\n");
+    }
 }

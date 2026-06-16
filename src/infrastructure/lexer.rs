@@ -665,4 +665,26 @@ mod tests {
         assert_eq!(tokens.len(), 1);
         assert_eq!(tokens[0], Token::Word("IF (R101==0) AND (R102>5)".to_string()));
     }
+
+    #[test]
+    fn test_repeat_no_condition() {
+        let tokens = tokenize("REPEAT");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Word("REPEAT".to_string()));
+    }
+
+    #[test]
+    fn test_while_no_condition() {
+        let tokens = tokenize("WHILE");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Word("WHILE".to_string()));
+    }
+
+    #[test]
+    fn test_r_alone() {
+        let tokens = tokenize("G0 R X100");
+        assert_eq!(tokens[0], Token::GCode(0));
+        assert_eq!(tokens[1], Token::Word("R".to_string()));
+        assert_eq!(tokens[2], Token::Axis("X".to_string(), Some(100.0)));
+    }
 }
