@@ -59,7 +59,8 @@ mod tests {
         let program = vec![Statement::Axis(AxisStatement {
             axis: "X".to_string(),
             value: None,
-        })];
+            decimal_places: None,
+})];
         let msgs = validate(&program);
         assert_eq!(msgs.len(), 1);
         assert!(msgs[0].message.contains("X"));
@@ -75,7 +76,8 @@ mod tests {
             Statement::Axis(AxisStatement {
                 axis: "Y".to_string(),
                 value: None,
-            }),
+                decimal_places: None,
+}),
         ];
         let msgs = validate(&program);
         assert_eq!(msgs.len(), 1);
@@ -92,7 +94,8 @@ mod tests {
             Statement::Axis(AxisStatement {
                 axis: "X".to_string(),
                 value: Some(10.0),
-            }),
+                decimal_places: None,
+}),
             Statement::NewLine,
         ];
         let msgs = validate(&program);

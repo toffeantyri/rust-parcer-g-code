@@ -91,7 +91,7 @@ impl Lexer {
 
         // Цифры и десятичная точка — число
         if ch.is_ascii_digit() || ch == '.' {
-            let num = self.read_number();
+            let (num, _) = self.read_number();
             return Token::Number(num);
         }
 
@@ -117,15 +117,15 @@ impl Lexer {
             let letter = word.to_uppercase();
             match letter.as_str() {
                 "G" => {
-                    let num = self.read_number();
+                    let (num, _) = self.read_number();
                     return Token::GCode(num as i32);
                 }
                 "M" => {
-                    let num = self.read_number();
+                    let (num, _) = self.read_number();
                     return Token::MCode(num as i32);
                 }
                 "N" => {
-                    let num = self.read_number();
+                    let (num, _) = self.read_number();
                     return Token::NCode(num as i32);
                 }
                 _ => {
@@ -137,11 +137,11 @@ impl Lexer {
                         }
                         // Если после буквы идёт число, минус или точка — читаем числовое значение оси
                         if self.ch.is_ascii_digit() || self.ch == '-' || self.ch == '.' {
-                            let value = self.read_number();
-                            return Token::Axis(letter, Some(value));
+                            let (value, decimals) = self.read_number();
+                            return Token::Axis(letter, Some(value), decimals);
                         }
                         // Ось без числа — оставляем None (будет ошибкой валидации)
-                        return Token::Axis(letter, None);
+                        return Token::Axis(letter, None, None);
                     }
                     // Проверяем R-параметр перед тем как вернуть как Word
                     if letter.as_str() == "R" && (self.ch.is_ascii_digit() || self.ch == '=') {
@@ -300,9 +300,13 @@ impl Lexer {
         Token::Word(full)
     }
 
-    /// Читает число (целое или с плавающей точкой)
-    fn read_number(&mut self) -> f64 {
+    /// Читает число (целое или с плавающей точкой).
+    /// Возвращает (значение, количество_знаков_после_запятой).
+    /// decimal_places: None = целое без точки, Some(0) = "10." без цифр после точки,
+    /// Some(n) = n цифр после точки.
+    fn read_number(&mut self) -> (f64, Option<usize>) {
         let mut result = String::new();
+        let mut decimal_places: Option<usize> = None;
 
         if self.ch == '-' {
             result.push(self.ch);
@@ -317,14 +321,17 @@ impl Lexer {
         if self.ch == '.' {
             result.push(self.ch);
             self.read_char();
+            decimal_places = Some(0);
 
             while self.ch.is_ascii_digit() {
                 result.push(self.ch);
                 self.read_char();
+                *decimal_places.as_mut().unwrap() += 1;
             }
         }
 
-        result.parse::<f64>().unwrap_or(0.0)
+        let value = result.parse::<f64>().unwrap_or(0.0);
+        (value, decimal_places)
     }
 
     /// Читает комментарий до конца строки (после `;`)

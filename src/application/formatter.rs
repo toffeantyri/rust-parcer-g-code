@@ -273,7 +273,12 @@ impl Formatter {
             }
             Statement::Axis(a) => {
                 if let Some(v) = a.value {
-                    format!("{}{:.prec$}", a.axis, v, prec = self.config.decimal_places)
+                    if let Some(prec) = a.decimal_places {
+                        format!("{}{:.prec$}", a.axis, v, prec = prec)
+                    } else {
+                        // Целое число — выводим без десятичной точки
+                        format!("{}{}", a.axis, v)
+                    }
                 } else {
                     a.axis.clone()
                 }

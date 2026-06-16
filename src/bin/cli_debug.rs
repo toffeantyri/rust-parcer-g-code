@@ -91,7 +91,7 @@ fn main() {
                     line.push_str(&format!("[{s}] "));
                 }
             }
-            Token::Axis(letter, val) => {
+            Token::Axis(letter, val, _) => {
                 match val {
                     Some(v) => line.push_str(&format!("{letter}{v} ")),
                     None => line.push_str(&format!("{letter}? ")),
@@ -116,9 +116,10 @@ fn format_token(tok: &Token) -> (String, String) {
         Token::MCode(n) => ("MCode".to_string(), format!("M{n:02}")),
         Token::NCode(n) => ("NCode".to_string(), format!("N{n:04}")),
         Token::Word(s) => ("Word".to_string(), s.clone()),
-        Token::Axis(letter, val) => {
+        Token::Axis(letter, val, dec) => {
             let v = val.map(|v| format!("{v}")).unwrap_or_else(|| "None".to_string());
-            ("Axis".to_string(), format!("{letter} = {v}"))
+            let dec_str = dec.map(|d| format!(" [{}]", d)).unwrap_or_default();
+            ("Axis".to_string(), format!("{letter} = {v}{dec_str}"))
         }
         Token::AxisExpr(letter, expr) => {
             ("AxisExpr".to_string(), format!("{letter}={expr}"))

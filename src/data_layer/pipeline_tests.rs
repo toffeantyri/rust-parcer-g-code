@@ -19,7 +19,7 @@ fn test_format_code_simple() {
     let result = format_code("G0 X10 Y20", 0, true);
     assert!(result.is_ok());
     let (formatted, _) = result.unwrap();
-    assert_eq!(formatted, "G0 X10.00000 Y20.00000\n");
+    assert_eq!(formatted, "G0 X10 Y20\n");
 }
 
 #[test]
@@ -27,7 +27,7 @@ fn test_format_code_multiline() {
     let result = format_code("G0 X10\nG1 Z5.5 F100", 0, true);
     assert!(result.is_ok());
     let (formatted, _) = result.unwrap();
-    assert_eq!(formatted, "G0 X10.00000\nG1 Z5.50000 F100.00000\n");
+    assert_eq!(formatted, "G0 X10\nG1 Z5.5 F100\n");
 }
 
 #[test]
@@ -35,8 +35,8 @@ fn test_format_code_with_renumber() {
     let result = format_code("G0 X10\nG1 Y20", 10, true);
     assert!(result.is_ok());
     let (formatted, _) = result.unwrap();
-    assert!(formatted.starts_with("N10 G0 X10.00000"));
-    assert!(formatted.contains("\nN20 G1 Y20.00000"));
+    assert!(formatted.starts_with("N10 G0 X10"));
+    assert!(formatted.contains("\nN20 G1 Y20"));
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn test_format_code_preserves_empty_lines() {
     assert!(result.is_ok());
     let (formatted, _) = result.unwrap();
     // Пустые строки сохраняются
-    assert_eq!(formatted, "G0 X10.00000\n\nG1 Y20.00000\n");
+    assert_eq!(formatted, "G0 X10\n\nG1 Y20\n");
 }
 
 #[test]

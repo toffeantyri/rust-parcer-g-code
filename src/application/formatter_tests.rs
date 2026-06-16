@@ -7,16 +7,16 @@ use crate::domain::*;
 fn test_format_simple_program() {
     let program = vec![
         Statement::Motion(MotionStatement { code: 0, rapid: true }),
-        Statement::Axis(AxisStatement { axis: "X".to_string(), value: Some(10.0) }),
-        Statement::Axis(AxisStatement { axis: "Y".to_string(), value: Some(20.0) }),
+        Statement::Axis(AxisStatement { axis: "X".to_string(), value: Some(10.0), decimal_places: None }),
+        Statement::Axis(AxisStatement { axis: "Y".to_string(), value: Some(20.0), decimal_places: None }),
         Statement::NewLine,
         Statement::Motion(MotionStatement { code: 1, rapid: false }),
-        Statement::Axis(AxisStatement { axis: "Z".to_string(), value: Some(5.5) }),
-        Statement::Axis(AxisStatement { axis: "F".to_string(), value: Some(100.0) }),
+        Statement::Axis(AxisStatement { axis: "Z".to_string(), value: Some(5.5), decimal_places: Some(1) }),
+        Statement::Axis(AxisStatement { axis: "F".to_string(), value: Some(100.0), decimal_places: None }),
     ];
     let formatter = Formatter::new(FormatConfig::default());
     let result = formatter.format_program(&program);
-    assert_eq!(result, "G0 X10.00000 Y20.00000\nG1 Z5.50000 F100.00000\n");
+    assert_eq!(result, "G0 X10 Y20\nG1 Z5.5 F100\n");
 }
 
 #[test]
@@ -100,7 +100,7 @@ fn test_renumber_skip_empty_false() {
 fn test_renumber_adds_ncode_to_lines_without() {
     let program = vec![
         Statement::Motion(MotionStatement { code: 0, rapid: true }),
-        Statement::Axis(AxisStatement { axis: "X".to_string(), value: Some(10.0) }),
+        Statement::Axis(AxisStatement { axis: "X".to_string(), value: Some(10.0), decimal_places: None }),
         Statement::NewLine,
         Statement::Motion(MotionStatement { code: 1, rapid: false }),
     ];
@@ -131,14 +131,14 @@ fn test_format_while_block() {
         condition: "R101<R103".into(),
         body: vec![
             Statement::Motion(MotionStatement { code: 1, rapid: false }),
-            Statement::Axis(AxisStatement { axis: "X".into(), value: Some(10.0) }),
+            Statement::Axis(AxisStatement { axis: "X".into(), value: Some(10.0), decimal_places: None }),
             Statement::NewLine,
         ],
     })];
     let formatter = Formatter::new(FormatConfig::default());
     let result = formatter.format_program(&program);
     assert!(result.contains("WHILE R101<R103\n"));
-    assert!(result.contains("  G1 X10.00000\n"));
+    assert!(result.contains("  G1 X10\n"));
     assert!(result.contains("ENDWHILE\n"));
 }
 
@@ -168,21 +168,21 @@ fn test_format_if_else_block() {
         condition: "R101==0".into(),
         then_body: vec![
             Statement::Motion(MotionStatement { code: 0, rapid: true }),
-            Statement::Axis(AxisStatement { axis: "X".into(), value: Some(10.0) }),
+            Statement::Axis(AxisStatement { axis: "X".into(), value: Some(10.0), decimal_places: None }),
             Statement::NewLine,
         ],
         else_body: Some(vec![
             Statement::Motion(MotionStatement { code: 1, rapid: false }),
-            Statement::Axis(AxisStatement { axis: "Y".into(), value: Some(20.0) }),
+            Statement::Axis(AxisStatement { axis: "Y".into(), value: Some(20.0), decimal_places: None }),
             Statement::NewLine,
         ]),
     })];
     let formatter = Formatter::new(FormatConfig::default());
     let result = formatter.format_program(&program);
     assert!(result.contains("IF R101==0\n"));
-    assert!(result.contains("  G0 X10.00000\n"));
+    assert!(result.contains("  G0 X10\n"));
     assert!(result.contains("ELSE\n"));
-    assert!(result.contains("  G1 Y20.00000\n"));
+    assert!(result.contains("  G1 Y20\n"));
     assert!(result.contains("ENDIF\n"));
 }
 
@@ -195,7 +195,7 @@ fn test_format_nested_while() {
                 condition: "R102<R103".into(),
                 body: vec![
                     Statement::Motion(MotionStatement { code: 1, rapid: false }),
-                    Statement::Axis(AxisStatement { axis: "X".into(), value: Some(10.0) }),
+                    Statement::Axis(AxisStatement { axis: "X".into(), value: Some(10.0), decimal_places: None }),
                     Statement::NewLine,
                 ],
             }),
@@ -206,7 +206,7 @@ fn test_format_nested_while() {
     let result = formatter.format_program(&program);
     assert!(result.contains("WHILE R101<R103\n"));
     assert!(result.contains("  WHILE R102<R103\n"));
-    assert!(result.contains("    G1 X10.00000\n"));
+    assert!(result.contains("    G1 X10\n"));
     assert!(result.contains("  ENDWHILE\n"));
     assert!(result.contains("ENDWHILE\n"));
 }

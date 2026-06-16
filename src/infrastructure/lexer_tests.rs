@@ -7,14 +7,14 @@ fn test_simple_gcode() {
     let tokens = tokenize("G0 X10 Y20 (Rapid move)\nG1 Z5.5 F100");
 
     assert_eq!(tokens[0], Token::GCode(0));
-    assert_eq!(tokens[1], Token::Axis("X".to_string(), Some(10.0)));
-    assert_eq!(tokens[2], Token::Axis("Y".to_string(), Some(20.0)));
+    assert_eq!(tokens[1], Token::Axis("X".to_string(), Some(10.0), None));
+    assert_eq!(tokens[2], Token::Axis("Y".to_string(), Some(20.0), None));
     // Скобки — не комментарий, а скобочное выражение (Word)
     assert_eq!(tokens[3], Token::Word("(Rapid move)".to_string()));
     assert_eq!(tokens[4], Token::NewLine);
     assert_eq!(tokens[5], Token::GCode(1));
-    assert_eq!(tokens[6], Token::Axis("Z".to_string(), Some(5.5)));
-    assert_eq!(tokens[7], Token::Axis("F".to_string(), Some(100.0)));
+    assert_eq!(tokens[6], Token::Axis("Z".to_string(), Some(5.5), Some(1)));
+    assert_eq!(tokens[7], Token::Axis("F".to_string(), Some(100.0), None));
 }
 
 #[test]
@@ -22,11 +22,11 @@ fn test_semicolon_comment() {
     let tokens = tokenize("G0 X10 ; this is a comment\nG1 Y20");
 
     assert_eq!(tokens[0], Token::GCode(0));
-    assert_eq!(tokens[1], Token::Axis("X".to_string(), Some(10.0)));
+    assert_eq!(tokens[1], Token::Axis("X".to_string(), Some(10.0), None));
     assert_eq!(tokens[2], Token::Comment(" this is a comment".to_string()));
     assert_eq!(tokens[3], Token::NewLine);
     assert_eq!(tokens[4], Token::GCode(1));
-    assert_eq!(tokens[5], Token::Axis("Y".to_string(), Some(20.0)));
+    assert_eq!(tokens[5], Token::Axis("Y".to_string(), Some(20.0), None));
 }
 
 #[test]
@@ -34,8 +34,8 @@ fn test_negative_numbers() {
     let tokens = tokenize("G0 X-10 Y-20.5");
 
     assert_eq!(tokens[0], Token::GCode(0));
-    assert_eq!(tokens[1], Token::Axis("X".to_string(), Some(-10.0)));
-    assert_eq!(tokens[2], Token::Axis("Y".to_string(), Some(-20.5)));
+    assert_eq!(tokens[1], Token::Axis("X".to_string(), Some(-10.0), None));
+    assert_eq!(tokens[2], Token::Axis("Y".to_string(), Some(-20.5), Some(1)));
 }
 
 #[test]
@@ -76,7 +76,7 @@ fn test_paren_expr() {
         tokens[1],
         Token::Word("(comment (nested) content)".to_string())
     );
-    assert_eq!(tokens[2], Token::Axis("X".to_string(), Some(10.0)));
+    assert_eq!(tokens[2], Token::Axis("X".to_string(), Some(10.0), None));
 }
 
 #[test]
@@ -86,7 +86,7 @@ fn test_multichar_words() {
     // Скобочные аргументы — часть слова
     assert_eq!(tokens[0], Token::Word("MODECHECK(2)".to_string()));
     assert_eq!(tokens[1], Token::Word("TRANS".to_string()));
-    assert_eq!(tokens[2], Token::Axis("Z".to_string(), Some(-8.0)));
+    assert_eq!(tokens[2], Token::Axis("Z".to_string(), Some(-8.0), None));
     assert_eq!(
         tokens[3],
         Token::Word("MATLCH(\"DISKD125\",0,1)".to_string())
@@ -108,9 +108,9 @@ fn test_axis_without_gcode() {
     // Строки начинающиеся с оси (продолжение предыдущего G-кода)
     let tokens = tokenize(" Z71.304\n Y-58.346");
 
-    assert_eq!(tokens[0], Token::Axis("Z".to_string(), Some(71.304)));
+    assert_eq!(tokens[0], Token::Axis("Z".to_string(), Some(71.304), Some(3)));
     assert_eq!(tokens[1], Token::NewLine);
-    assert_eq!(tokens[2], Token::Axis("Y".to_string(), Some(-58.346)));
+    assert_eq!(tokens[2], Token::Axis("Y".to_string(), Some(-58.346), Some(3)));
 }
 
 // -----------------------------------------------------------------------
@@ -130,11 +130,11 @@ fn test_comment_at_end_of_line() {
     let tokens = tokenize("G0 X10 ;это комментарий\nG1 Y20");
 
     assert_eq!(tokens[0], Token::GCode(0));
-    assert_eq!(tokens[1], Token::Axis("X".to_string(), Some(10.0)));
+    assert_eq!(tokens[1], Token::Axis("X".to_string(), Some(10.0), None));
     assert_eq!(tokens[2], Token::Comment("это комментарий".to_string()));
     assert_eq!(tokens[3], Token::NewLine);
     assert_eq!(tokens[4], Token::GCode(1));
-    assert_eq!(tokens[5], Token::Axis("Y".to_string(), Some(20.0)));
+    assert_eq!(tokens[5], Token::Axis("Y".to_string(), Some(20.0), None));
 }
 
 #[test]
@@ -150,7 +150,7 @@ fn test_unknown_symbols() {
 fn test_axis_with_negative_value() {
     // Ось с отрицательным числом без пробела, без G-кода
     let tokens = tokenize("X-10");
-    assert_eq!(tokens[0], Token::Axis("X".to_string(), Some(-10.0)));
+    assert_eq!(tokens[0], Token::Axis("X".to_string(), Some(-10.0), None));
 }
 
 #[test]
@@ -202,7 +202,7 @@ fn test_r_parameter_simple() {
     let tokens = tokenize("G0 R50 X100");
     assert_eq!(tokens[0], Token::GCode(0));
     assert_eq!(tokens[1], Token::Word("R50".to_string()));
-    assert_eq!(tokens[2], Token::Axis("X".to_string(), Some(100.0)));
+    assert_eq!(tokens[2], Token::Axis("X".to_string(), Some(100.0), None));
 }
 
 #[test]
@@ -329,5 +329,5 @@ fn test_r_alone() {
     let tokens = tokenize("G0 R X100");
     assert_eq!(tokens[0], Token::GCode(0));
     assert_eq!(tokens[1], Token::Word("R".to_string()));
-    assert_eq!(tokens[2], Token::Axis("X".to_string(), Some(100.0)));
+    assert_eq!(tokens[2], Token::Axis("X".to_string(), Some(100.0), None));
 }

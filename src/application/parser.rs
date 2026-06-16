@@ -46,9 +46,10 @@ impl Parser {
                 rapid: *code == 0,
             }))),
             Token::MCode(code) => Ok(Some(Statement::Misc(MiscStatement { code: *code }))),
-            Token::Axis(axis, value) => Ok(Some(Statement::Axis(AxisStatement {
+            Token::Axis(axis, value, decimals) => Ok(Some(Statement::Axis(AxisStatement {
                 axis: axis.clone(),
                 value: *value,
+                decimal_places: *decimals,
             }))),
             Token::AxisExpr(axis, expr) => {
                 Ok(Some(Statement::Word(format!("{}={}", axis, expr))))
@@ -132,9 +133,10 @@ impl Parser {
                 Token::MCode(code) => {
                     body.push(Statement::Misc(MiscStatement { code: *code }))
                 }
-                Token::Axis(axis, value) => body.push(Statement::Axis(AxisStatement {
+                Token::Axis(axis, value, decimals) => body.push(Statement::Axis(AxisStatement {
                     axis: axis.clone(),
                     value: *value,
+                    decimal_places: *decimals,
                 })),
                 Token::AxisExpr(axis, expr) => body.push(Statement::Word(format!(
                     "{}={}",
@@ -212,9 +214,10 @@ impl Parser {
                 Token::MCode(code) => {
                     body.push(Statement::Misc(MiscStatement { code: *code }))
                 }
-                Token::Axis(axis, value) => body.push(Statement::Axis(AxisStatement {
+                Token::Axis(axis, value, decimals) => body.push(Statement::Axis(AxisStatement {
                     axis: axis.clone(),
                     value: *value,
+                    decimal_places: *decimals,
                 })),
                 Token::AxisExpr(axis, expr) => body.push(Statement::Word(format!(
                     "{}={}",
@@ -304,13 +307,14 @@ impl Parser {
                     in_else,
                     Statement::Misc(MiscStatement { code: *code }),
                 ),
-                Token::Axis(axis, value) => push_to(
+                Token::Axis(axis, value, decimals) => push_to(
                     &mut then_body,
                     &mut else_body,
                     in_else,
                     Statement::Axis(AxisStatement {
                         axis: axis.clone(),
                         value: *value,
+                        decimal_places: *decimals,
                     }),
                 ),
                 Token::AxisExpr(axis, expr) => push_to(
@@ -408,13 +412,14 @@ impl Parser {
                     in_else,
                     Statement::Misc(MiscStatement { code: *code }),
                 ),
-                Token::Axis(axis, value) => push_to(
+                Token::Axis(axis, value, decimals) => push_to(
                     &mut then_body,
                     &mut else_body,
                     in_else,
                     Statement::Axis(AxisStatement {
                         axis: axis.clone(),
                         value: *value,
+                        decimal_places: *decimals,
                     }),
                 ),
                 Token::AxisExpr(axis, expr) => push_to(
@@ -462,7 +467,7 @@ impl Parser {
         match token {
             Token::GCode(code) => format!("G{}", code),
             Token::MCode(code) => format!("M{}", code),
-            Token::Axis(axis, value) => {
+            Token::Axis(axis, value, _) => {
                 if let Some(v) = value {
                     format!("{}{}", axis, v)
                 } else {

@@ -46,6 +46,9 @@ pub struct MiscStatement {
 pub struct AxisStatement {
     pub axis: String,
     pub value: Option<f64>,
+    /// Количество знаков после запятой в исходном тексте.
+    /// None = целое число без точки, Some(n) = n знаков после запятой.
+    pub decimal_places: Option<usize>,
 }
 
 /// Комментарий
@@ -83,7 +86,11 @@ impl fmt::Display for Statement {
             Statement::Misc(m) => write!(f, "M{}", m.code),
             Statement::Axis(a) => {
                 if let Some(v) = a.value {
-                    write!(f, "{}{}", a.axis, v)
+                    if let Some(prec) = a.decimal_places {
+                        write!(f, "{}{:.prec$}", a.axis, v, prec = prec)
+                    } else {
+                        write!(f, "{}{}", a.axis, v)
+                    }
                 } else {
                     write!(f, "{}", a.axis)
                 }
@@ -110,6 +117,7 @@ mod tests {
         let axis = Statement::Axis(AxisStatement {
             axis: "X".to_string(),
             value: Some(10.5),
+            decimal_places: Some(1),
         });
         let comment = Statement::Comment(CommentStatement {
             text: "Test move".to_string(),
@@ -140,6 +148,7 @@ mod tests {
         let axis_none = Statement::Axis(AxisStatement {
             axis: "X".to_string(),
             value: None,
+            decimal_places: None,
         });
         assert_eq!(axis_none.to_string(), "X");
 
