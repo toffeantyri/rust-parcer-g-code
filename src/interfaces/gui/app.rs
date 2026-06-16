@@ -73,6 +73,7 @@ impl GCodeApp {
                 PipelineEvent::Formatted { content, errors } => {
                     if !content.is_empty() {
                         self.model.content = content;
+                        self.model.modified = true;
                     }
                     if errors.is_empty() {
                         self.model.status = i18n::locale().status.formatted.to_string();
