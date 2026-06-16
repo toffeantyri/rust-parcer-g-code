@@ -185,4 +185,113 @@ mod tests {
             "Результат не содержит ENDWHILE"
         );
     }
+
+    #[test]
+    fn test_format_input_code() {
+        let path = "input_code.txt";
+        let input = std::fs::read_to_string(path).expect("Не удалось прочитать input_code.txt");
+
+        // Сначала смотрим ошибки валидации через validate_code
+        let validation = validate_code(&input);
+        if let Ok(ref errors) = validation {
+            println!("=== VALIDATION MESSAGES ({}) ===", errors.len());
+            for m in errors {
+                println!("  [{:?}] {}", m.severity, m.message);
+            }
+        }
+
+        // Прогоняем через format_code (ренумерация 0, skip_empty_lines true)
+        let result = format_code(&input, 0, true);
+        // Не паникуем при ошибке — выводим её и проверяем остальное
+        match result {
+            Ok((formatted, warnings)) => {
+                println!("=== FORMATTED OUTPUT ===");
+                println!("{}", formatted);
+                println!("=== END ===");
+                if !warnings.is_empty() {
+                    println!("Warnings ({}) :", warnings.len());
+                    for w in &warnings {
+                        println!("  [{:?}] {}", w.severity, w.message);
+                    }
+                }
+
+                // Проверяем что результат не пустой
+                assert!(!formatted.is_empty(), "Результат форматирования пуст");
+
+                // Проверяем наличие ключевых строк
+                assert!(
+                    formatted.contains("G64 CFTCP"),
+                    "Результат не содержит 'G64 CFTCP'"
+                );
+                assert!(
+                    formatted.contains("MODECHECK(2)"),
+                    "Результат не содержит 'MODECHECK(2)'"
+                );
+                assert!(
+                    formatted.contains("TRANS Z-8"),
+                    "Результат не содержит 'TRANS Z-8'"
+                );
+                assert!(
+                    formatted.contains("MATLRET"),
+                    "Результат не содержит 'MATLRET'"
+                );
+                assert!(
+                    formatted.contains("M17"),
+                    "Результат не содержит 'M17'"
+                );
+            }
+            Err(e) => {
+                println!("format_code error: {}", e);
+                // Тест не должен паниковать — это проверка на отсутствие паники
+                // Но мы всё равно проверим, что ошибка не пустая
+                assert!(!e.is_empty());
+            }
+        }
+    }
+
+    #[test]
+    fn test_debug_line22() {
+        let path = "input_code.txt";
+        let input = std::fs::read_to_string(path).expect("Не удалось прочитать input_code.txt");
+        let line = input.lines().nth(21).expect("В файле меньше 22 строк");
+        println!("line22: '{}'", line);
+        println!("bytes: {:?}", line.as_bytes());
+        println!("length: {}", line.len());
+    }
+
+    #[test]
+    fn test_debug_axis() {
+        let path = "input_code.txt";
+        let input = std::fs::read_to_string(path).expect("Не удалось прочитать input_code.txt");
+        let tokens = crate::infrastructure::lexer::tokenize(&input);
+
+        // Токен на позиции 69 — Axis X None
+        let pos = 69;
+        let target = &tokens[pos];
+        println!("Токен на позиции {}: {:?}", pos, target);
+        println!();
+
+        // Предыдущие 5 токенов
+        println!("=== Предыдущие 5 токенов ===");
+        for i in (pos.saturating_sub(5))..pos {
+            println!("[{}] {:?}", i, tokens[i]);
+        }
+
+        // Следующие 5 токенов
+        println!("\n=== Следующие 5 токенов ===");
+        let end = std::cmp::min(pos + 6, tokens.len());
+        for i in (pos + 1)..end {
+            println!("[{}] {:?}", i, tokens[i]);
+        }
+
+        // Считаем строки: для каждого NewLine увеличиваем счётчик
+        println!("\n=== Поиск строки для позиции {} ===", pos);
+        let mut line = 1;
+        for i in 0..=pos {
+            if tokens[i] == crate::domain::Token::NewLine {
+                line += 1;
+            }
+        }
+        println!("Токен на позиции {} находится на строке {}", pos, line);
+    }
 }

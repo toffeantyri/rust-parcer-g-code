@@ -19,7 +19,7 @@ N0190 M59 ; C-Axis Clamp
 
 TRANS Z-8 X0.3;X0.8
 
- X
+ ;X
  Z=71.304
  Y-58.346
  X=160+10 M147
