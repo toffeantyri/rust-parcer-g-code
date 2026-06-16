@@ -3,7 +3,7 @@
 use std::sync::mpsc;
 use std::time::Instant;
 
-use eframe::egui;
+use egui;
 
 use crate::data_layer::{
     DialogCommand, DialogEvent, EditorCommand, EditorEvent, FileCommand, FileEvent,

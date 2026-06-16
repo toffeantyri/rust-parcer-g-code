@@ -2,7 +2,7 @@
 
 use code_parser::data_layer::spawn_data_layer;
 use code_parser::interfaces::gui::GCodeApp;
-use eframe::egui;
+use egui;
 
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {

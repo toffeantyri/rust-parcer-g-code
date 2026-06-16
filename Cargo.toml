@@ -16,8 +16,8 @@ path = "src/bin/gui_main.rs"
 thiserror = "2.0"
 rfd = "0.15"
 
-# GUI
-eframe = "0.31"
+# GUI — wgpu вместо glow (исправляет баг glutin/wgl на Windows)
+eframe = { version = "0.31", default-features = false, features = ["wgpu"] }
 egui = "0.31"
 
 # Сериализация настроек
