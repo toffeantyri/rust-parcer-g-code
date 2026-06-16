@@ -4,7 +4,6 @@
 
 use std::env;
 use std::fs;
-use std::io::{self, Write};
 
 use code_parser::infrastructure::lexer::tokenize;
 use code_parser::domain::Token;
@@ -74,14 +73,40 @@ fn main() {
     println!("──────────────────────────────────────────────────────────────");
     println!();
 
-    let stdout = io::stdout();
-    let mut handle = stdout.lock();
-
+    // Собираем восстановленный текст построчно
+    let mut line = String::new();
     for tok in &tokens {
-        write_token(&mut handle, tok);
+        match tok {
+            Token::NewLine => {
+                println!("{line}<NL>");
+                line.clear();
+            }
+            Token::GCode(n) => line.push_str(&format!("G{n:02} ")),
+            Token::MCode(n) => line.push_str(&format!("M{n:02} ")),
+            Token::NCode(n) => line.push_str(&format!("N{n:04} ")),
+            Token::Word(s) => {
+                if s.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()) {
+                    line.push_str(&format!("{s} "));
+                } else {
+                    line.push_str(&format!("[{s}] "));
+                }
+            }
+            Token::Axis(letter, val) => {
+                match val {
+                    Some(v) => line.push_str(&format!("{letter}{v} ")),
+                    None => line.push_str(&format!("{letter}? ")),
+                }
+            }
+            Token::AxisExpr(letter, expr) => line.push_str(&format!("{letter}={expr} ")),
+            Token::Number(n) => line.push_str(&format!("{n} ")),
+            Token::Comment(s) => line.push_str(&format!(";{s}")),
+            Token::Unknown(ch) => line.push_str(&format!("?{ch}? ")),
+            Token::Eof => {}
+        }
     }
-    let _ = handle.write_all(b"\n");
-    let _ = handle.flush();
+    if !line.is_empty() {
+        println!("{line}");
+    }
 }
 
 /// Форматирует токен в пару (тип, значение) для табличного вывода
@@ -106,35 +131,7 @@ fn format_token(tok: &Token) -> (String, String) {
     }
 }
 
-/// Выводит токен в человекопонятном виде — как он будет выглядеть в тексте
-fn write_token(handle: &mut dyn Write, tok: &Token) {
-    let _ = match tok {
-        Token::GCode(n) => write!(handle, "G{n:02} "),
-        Token::MCode(n) => write!(handle, "M{n:02} "),
-        Token::NCode(n) => write!(handle, "N{n:04} "),
-        Token::Word(s) => {
-            if s.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()) {
-                write!(handle, "{s} ")
-            } else {
-                write!(handle, "[{s}] ")
-            }
-        }
-        Token::Axis(letter, val) => {
-            match val {
-                Some(v) => write!(handle, "{letter}{v} "),
-                None => write!(handle, "{letter}? "),
-            }
-        }
-        Token::AxisExpr(letter, expr) => {
-            write!(handle, "{letter}={expr} ")
-        }
-        Token::Number(n) => write!(handle, "{n} "),
-        Token::Comment(s) => write!(handle, ";{s}"),
-        Token::NewLine => writeln!(handle, "<NL>"),
-        Token::Eof => Ok(()),
-        Token::Unknown(ch) => write!(handle, "?{ch}? "),
-    };
-}
+
 
 fn truncate(s: &str, max: usize) -> String {
     if s.chars().count() > max {

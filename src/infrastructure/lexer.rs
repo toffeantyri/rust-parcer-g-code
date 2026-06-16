@@ -161,14 +161,43 @@ impl Lexer {
             after_word = self.ch;
         }
 
+        // Проверяем, является ли слово ключевым словом управления потоком
+        // (до того как word будет перемещён в full_word)
+        let is_flow_control = {
+            let upper = word.to_uppercase();
+            upper == "WHILE" || upper == "IF" || upper == "ELSE" || upper == "REPEAT" || upper == "UNTIL"
+        };
+
         let mut full_word = word;
-        // Если после слова (возможно с пробелом) идёт `(`, читаем весь блок в скобках
-        if self.ch == '(' {
-            full_word.push('(');
-            self.read_char();
-            let args = self.read_parenthesized_content();
-            full_word.push_str(&args);
-            full_word.push(')');
+
+        // Для ключевых слов управления потоком захватываем всё условие до конца
+        // строки целиком (включая скобки), не разбирая скобки отдельно.
+        if is_flow_control {
+            // Пропускаем пробелы перед условием
+            while self.ch.is_whitespace() && self.ch != '\n' {
+                self.read_char();
+            }
+            // Читаем всё до конца строки или ';'
+            if self.ch != '\n' && self.ch != ';' && self.ch != '\0' {
+                full_word.push(' ');
+                while self.ch != '\n' && self.ch != ';' && self.ch != '\0' {
+                    full_word.push(self.ch);
+                    self.read_char();
+                }
+                // Убираем trailing пробелы
+                while full_word.ends_with(' ') {
+                    full_word.pop();
+                }
+            }
+        } else {
+            // Если после слова (возможно с пробелом) идёт `(`, читаем весь блок в скобках
+            if self.ch == '(' {
+                full_word.push('(');
+                self.read_char();
+                let args = self.read_parenthesized_content();
+                full_word.push_str(&args);
+                full_word.push(')');
+            }
         }
 
         Token::Word(full_word)
@@ -536,5 +565,104 @@ mod tests {
     fn test_r_check() {
         let tokens = tokenize("RCHECK");
         assert_eq!(tokens[0], Token::Word("RCHECK".to_string()));
+    }
+
+    #[test]
+    fn test_while_condition() {
+        let tokens = tokenize("WHILE R101<R103");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Word("WHILE R101<R103".to_string()));
+    }
+
+    #[test]
+    fn test_while_condition_with_parens() {
+        let tokens = tokenize("WHILE (R101<3) AND (R102>0)");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(
+            tokens[0],
+            Token::Word("WHILE (R101<3) AND (R102>0)".to_string())
+        );
+    }
+
+    #[test]
+    fn test_if_condition() {
+        let tokens = tokenize("IF R101==0");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Word("IF R101==0".to_string()));
+    }
+
+    #[test]
+    fn test_endwhile_no_condition() {
+        let tokens = tokenize("ENDWHILE");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Word("ENDWHILE".to_string()));
+    }
+
+    #[test]
+    fn test_endif_no_condition() {
+        let tokens = tokenize("ENDIF");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Word("ENDIF".to_string()));
+    }
+
+    #[test]
+    fn test_else_standalone() {
+        let tokens = tokenize("ELSE");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Word("ELSE".to_string()));
+    }
+
+    #[test]
+    fn test_repeat_condition() {
+        let tokens = tokenize("REPEAT R101<R103");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Word("REPEAT R101<R103".to_string()));
+    }
+
+    #[test]
+    fn test_until_condition() {
+        let tokens = tokenize("UNTIL R101>=R103");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Word("UNTIL R101>=R103".to_string()));
+    }
+
+    #[test]
+    fn test_system_variable_standalone() {
+        // Системная переменная без R-параметра
+        let tokens = tokenize("$TC_MPP6[9998,1]");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Word("$TC_MPP6[9998,1]".to_string()));
+    }
+
+    #[test]
+    fn test_while_with_trailing_comment() {
+        // WHILE с комментарием — условие не должно включать комментарий
+        let tokens = tokenize("WHILE R101<R103 ; loop condition");
+        assert_eq!(tokens.len(), 2);
+        assert_eq!(tokens[0], Token::Word("WHILE R101<R103".to_string()));
+        assert_eq!(tokens[1], Token::Comment(" loop condition".to_string()));
+    }
+
+    #[test]
+    fn test_if_lowercase() {
+        // Ключевые слова регистронезависимы
+        let tokens = tokenize("if R101==0");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Word("if R101==0".to_string()));
+    }
+
+    #[test]
+    fn test_until_with_spaces() {
+        // UNTIL с пробелами вокруг скобок
+        let tokens = tokenize("UNTIL (R101>=R103)");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Word("UNTIL (R101>=R103)".to_string()));
+    }
+
+    #[test]
+    fn test_if_with_parens() {
+        let tokens = tokenize("IF (R101==0) AND (R102>5)");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Word("IF (R101==0) AND (R102>5)".to_string()));
     }
 }
