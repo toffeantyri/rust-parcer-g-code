@@ -46,27 +46,22 @@ impl Formatter {
         for stmt in program {
             match stmt {
                 Statement::WhileBlock(w) => {
-                    // Собираем префикс из текущей строки (обычно N-код)
-                    let prefix = if !line_parts.is_empty() {
-                        let p = line_parts.join(" ");
+                    // Завершаем текущую строку, сбрасываем N-код
+                    if !line_parts.is_empty() {
+                        result.push_str(&self.format_line(&line_parts));
                         line_parts.clear();
                         line_has_ncode = false;
-                        Some(p)
-                    } else {
-                        None
-                    };
-                    result.push_str(&self.format_while(w, indent_level, prefix));
+                    }
+                    // WHILE без N-кода
+                    result.push_str(&self.format_while(w, indent_level));
                 }
                 Statement::IfBlock(i) => {
-                    let prefix = if !line_parts.is_empty() {
-                        let p = line_parts.join(" ");
+                    if !line_parts.is_empty() {
+                        result.push_str(&self.format_line(&line_parts));
                         line_parts.clear();
                         line_has_ncode = false;
-                        Some(p)
-                    } else {
-                        None
-                    };
-                    result.push_str(&self.format_if(i, indent_level, prefix));
+                    }
+                    result.push_str(&self.format_if(i, indent_level));
                 }
                 Statement::NewLine => {
                     if !line_parts.is_empty() {
@@ -140,19 +135,13 @@ impl Formatter {
         &self,
         w: &WhileStatement,
         indent_level: usize,
-        line_prefix: Option<String>,
     ) -> String {
         let indent = self.make_indent(indent_level);
         let body_indent = self.make_indent(indent_level + 1);
         let mut out = String::new();
 
-        // WHILE на одной строке с N-кодом (если есть)
-        let while_line = if let Some(ref prefix) = line_prefix {
-            format!("{}{prefix} WHILE {}", indent, w.condition)
-        } else {
-            format!("{}WHILE {}", indent, w.condition)
-        };
-        out.push_str(&format!("{}\n", while_line));
+        // WHILE без N-кода
+        out.push_str(&format!("{}WHILE {}\n", indent, w.condition));
 
         // Тело
         let body = self.format_block(&w.body, indent_level + 1);
@@ -164,7 +153,7 @@ impl Formatter {
             }
         }
 
-        // ENDWHILE — если есть N-код от пустой строки внутри тела, он уже в body
+        // ENDWHILE
         out.push_str(&format!("{}ENDWHILE\n", indent));
 
         out
@@ -174,19 +163,13 @@ impl Formatter {
         &self,
         i: &IfStatement,
         indent_level: usize,
-        line_prefix: Option<String>,
     ) -> String {
         let indent = self.make_indent(indent_level);
         let body_indent = self.make_indent(indent_level + 1);
         let mut out = String::new();
 
-        // IF на одной строке с N-кодом
-        let if_line = if let Some(ref prefix) = line_prefix {
-            format!("{}{prefix} IF {}", indent, i.condition)
-        } else {
-            format!("{}IF {}", indent, i.condition)
-        };
-        out.push_str(&format!("{}\n", if_line));
+        // IF без N-кода
+        out.push_str(&format!("{}IF {}\n", indent, i.condition));
 
         // THEN
         let then_body = self.format_block(&i.then_body, indent_level + 1);
@@ -404,7 +387,7 @@ mod tests {
 
     #[test]
     fn test_format_while_with_ncode() {
-        // WHILE должен быть на одной строке с N-кодом
+        // N-код на отдельной строке, WHILE без номера
         let program = vec![
             Statement::NCode(230),
             Statement::WhileBlock(WhileStatement {
@@ -417,7 +400,7 @@ mod tests {
         ];
         let formatter = Formatter::new(FormatConfig::default());
         let result = formatter.format_program(&program);
-        assert!(result.contains("N0230 WHILE R101<R103\n"), "N-код должен быть на строке WHILE:\n{}", result);
+        assert!(result.contains("N0230\nWHILE R101<R103\n"), "N-код должен быть на отдельной строке перед WHILE:\n{}", result);
         assert!(result.contains("  G1\n"));
         assert!(result.contains("ENDWHILE\n"));
     }
