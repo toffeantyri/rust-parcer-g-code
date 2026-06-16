@@ -187,6 +187,63 @@ mod tests {
     }
 
     #[test]
+    fn test_format_text_params_renumber() {
+        let path = "text_params.txt";
+        let input = std::fs::read_to_string(path).expect("Не удалось прочитать text_params.txt");
+        let result = format_code(&input, 10, true);
+        assert!(result.is_ok(), "format_code вернул ошибку: {:?}", result.err());
+        let (formatted, warnings) = result.unwrap();
+
+        println!("=== FORMATTED OUTPUT (renumber_step=10) ===");
+        println!("{}", formatted);
+        println!("=== END ===");
+        if !warnings.is_empty() {
+            println!("Warnings ({}) :", warnings.len());
+            for w in &warnings {
+                println!("  [{:?}] {}", w.severity, w.message);
+            }
+        }
+
+        // Проверка: перед WHILE нет N-кода (строка WHILE отдельная, предыдущая пустая)
+        // ENDWHILE — на отдельной строке без N-кода
+        let lines: Vec<&str> = formatted.lines().collect();
+        for i in 0..lines.len() {
+            let trimmed = lines[i].trim();
+            if trimmed == "WHILE" {
+                // WHILE не начинается с N (уже верно, т.к. trimmed == "WHILE")
+                if i > 0 {
+                    let prev = lines[i - 1].trim();
+                    assert!(
+                        prev.is_empty(),
+                        "Перед WHILE (строка {}) предыдущая строка не пустая: '{}'",
+                        i + 1,
+                        prev
+                    );
+                }
+            }
+            if trimmed == "ENDWHILE" {
+                // ENDWHILE не начинается с N (уже верно, т.к. trimmed == "ENDWHILE")
+                // и не содержит N-кода в строке
+                assert!(
+                    !trimmed.starts_with('N'),
+                    "ENDWHILE (строка {}) содержит N-код: '{}'",
+                    i + 1,
+                    trimmed
+                );
+            }
+        }
+
+        assert!(
+            formatted.contains("WHILE"),
+            "Результат не содержит WHILE"
+        );
+        assert!(
+            formatted.contains("ENDWHILE"),
+            "Результат не содержит ENDWHILE"
+        );
+    }
+
+    #[test]
     fn test_format_input_code() {
         let path = "input_code.txt";
         let input = std::fs::read_to_string(path).expect("Не удалось прочитать input_code.txt");

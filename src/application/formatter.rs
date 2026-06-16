@@ -46,18 +46,34 @@ impl Formatter {
         for stmt in program {
             match stmt {
                 Statement::WhileBlock(w) => {
-                    // Завершаем текущую строку, сбрасываем N-код
+                    // Если в line_parts только N-код и включена перенумерация
+                    // со skip_empty_lines — удаляем N-код, оставляем пустую строку
                     if !line_parts.is_empty() {
-                        result.push_str(&self.format_line(&line_parts));
+                        let has_only_ncode = line_has_ncode && line_parts.len() == 1;
+                        if self.config.renumber_step > 0
+                            && self.config.skip_empty_lines
+                            && has_only_ncode
+                        {
+                            result.push('\n');
+                        } else {
+                            result.push_str(&self.format_line(&line_parts));
+                        }
                         line_parts.clear();
                         line_has_ncode = false;
                     }
-                    // WHILE без N-кода
                     result.push_str(&self.format_while(w, indent_level));
                 }
                 Statement::IfBlock(i) => {
                     if !line_parts.is_empty() {
-                        result.push_str(&self.format_line(&line_parts));
+                        let has_only_ncode = line_has_ncode && line_parts.len() == 1;
+                        if self.config.renumber_step > 0
+                            && self.config.skip_empty_lines
+                            && has_only_ncode
+                        {
+                            result.push('\n');
+                        } else {
+                            result.push_str(&self.format_line(&line_parts));
+                        }
                         line_parts.clear();
                         line_has_ncode = false;
                     }
@@ -145,7 +161,19 @@ impl Formatter {
 
         // Тело
         let body = self.format_block(&w.body, indent_level + 1);
-        for line in body.lines() {
+        let mut lines: Vec<&str> = body.lines().collect();
+        // Убираем trailing N-коды перед ENDWHILE
+        if self.config.skip_empty_lines {
+            while let Some(last) = lines.last() {
+                let trimmed = last.trim();
+                if trimmed.is_empty() || Self::is_only_ncode(trimmed) {
+                    lines.pop();
+                } else {
+                    break;
+                }
+            }
+        }
+        for line in &lines {
             if line.trim().is_empty() {
                 out.push('\n');
             } else {
@@ -173,7 +201,18 @@ impl Formatter {
 
         // THEN
         let then_body = self.format_block(&i.then_body, indent_level + 1);
-        for line in then_body.lines() {
+        let mut lines: Vec<&str> = then_body.lines().collect();
+        if self.config.skip_empty_lines {
+            while let Some(last) = lines.last() {
+                let trimmed = last.trim();
+                if trimmed.is_empty() || Self::is_only_ncode(trimmed) {
+                    lines.pop();
+                } else {
+                    break;
+                }
+            }
+        }
+        for line in &lines {
             if line.trim().is_empty() {
                 out.push('\n');
             } else {
@@ -185,7 +224,18 @@ impl Formatter {
         if let Some(ref else_body) = i.else_body {
             out.push_str(&format!("{}ELSE\n", indent));
             let else_fmt = self.format_block(else_body, indent_level + 1);
-            for line in else_fmt.lines() {
+            let mut lines: Vec<&str> = else_fmt.lines().collect();
+            if self.config.skip_empty_lines {
+                while let Some(last) = lines.last() {
+                    let trimmed = last.trim();
+                    if trimmed.is_empty() || Self::is_only_ncode(trimmed) {
+                        lines.pop();
+                    } else {
+                        break;
+                    }
+                }
+            }
+            for line in &lines {
                 if line.trim().is_empty() {
                     out.push('\n');
                 } else {
@@ -238,6 +288,12 @@ impl Formatter {
 
     fn format_line(&self, parts: &[String]) -> String {
         format!("{}\n", parts.join(" "))
+    }
+
+    /// Проверяет, состоит ли строка только из N-кода (например "N0440")
+    fn is_only_ncode(s: &str) -> bool {
+        let s = s.trim();
+        s.len() >= 2 && s.starts_with('N') && s[1..].chars().all(|c| c.is_ascii_digit())
     }
 }
 
