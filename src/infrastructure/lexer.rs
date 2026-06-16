@@ -67,6 +67,9 @@ impl Lexer {
                 self.read_char();
                 return Token::NewLine;
             }
+            '$' => {
+                return self.read_system_variable();
+            }
             _ => {}
         }
 
@@ -127,7 +130,7 @@ impl Lexer {
                 }
                 _ => {
                     // Проверяем, является ли буква осью
-                    if "XYZABCUVWRFSIJKR".contains(letter.as_str()) {
+                    if "XYZABCUVWFSIJK".contains(letter.as_str()) {
                         // Если после буквы идёт `=`, читаем выражение
                         if self.ch == '=' {
                             return self.read_axis_expr(letter);
@@ -139,6 +142,10 @@ impl Lexer {
                         }
                         // Ось без числа — оставляем None (будет ошибкой валидации)
                         return Token::Axis(letter, None);
+                    }
+                    // Проверяем R-параметр перед тем как вернуть как Word
+                    if letter.as_str() == "R" && (self.ch.is_ascii_digit() || self.ch == '=') {
+                        return self.read_r_parameter(letter);
                     }
                     // Одиночная неизвестная буква — Word
                     return Token::Word(word);
@@ -218,6 +225,50 @@ impl Lexer {
             self.read_char();
         }
         Token::AxisExpr(axis, expr)
+    }
+
+    /// Читает системную переменную Siemens: $TC_MPP6[9998,1] и т.д.
+    /// Начинается с '$', читает всё до пробела / новой строки / ';'.
+    fn read_system_variable(&mut self) -> Token {
+        let mut var = String::from("$");
+        self.read_char(); // пропускаем $
+        while self.ch != '\0' && !self.ch.is_whitespace() && self.ch != ';' && self.ch != '\n' {
+            var.push(self.ch);
+            self.read_char();
+        }
+        Token::Word(var)
+    }
+
+    /// Читает R-параметр (R50, R101...) и последующее присваивание если есть.
+    /// Возвращает единый Word: "R50", "R101=R101+1" и т.д.
+    fn read_r_parameter(&mut self, prefix: String) -> Token {
+        let mut full = prefix;
+        // Читаем число после R (например R50, R101)
+        if self.ch.is_ascii_digit() {
+            while self.ch.is_ascii_digit() {
+                full.push(self.ch);
+                self.read_char();
+            }
+        }
+        // Пропускаем пробелы перед '=' (бывает "R100 = ...")
+        while self.ch.is_whitespace() && self.ch != '\n' {
+            self.read_char();
+        }
+        // Если после числа/пробелов идёт '=', читаем всё выражение присваивания
+        if self.ch == '=' {
+            full.push('=');
+            self.read_char(); // пропускаем =
+            // Пропускаем пробелы после '=' (бывает "R100 = 5")
+            while self.ch.is_whitespace() && self.ch != '\n' {
+                self.read_char();
+            }
+            // Читаем всё до пробела, новой строки или ';'
+            while self.ch != '\0' && !self.ch.is_whitespace() && self.ch != ';' && self.ch != '\n' {
+                full.push(self.ch);
+                self.read_char();
+            }
+        }
+        Token::Word(full)
     }
 
     /// Читает число (целое или с плавающей точкой)
@@ -416,11 +467,10 @@ mod tests {
     #[test]
     fn test_unknown_symbols() {
         // Неизвестные символы не должны вызывать панику
-        let tokens = tokenize("@#$%");
+        let tokens = tokenize("@#%");
         assert_eq!(tokens[0], Token::Unknown('@'));
         assert_eq!(tokens[1], Token::Unknown('#'));
-        assert_eq!(tokens[2], Token::Unknown('$'));
-        assert_eq!(tokens[3], Token::Unknown('%'));
+        assert_eq!(tokens[2], Token::Unknown('%'));
     }
 
     #[test]
@@ -451,5 +501,40 @@ mod tests {
         assert_eq!(tokens.len(), 2);
         assert_eq!(tokens[0], Token::NewLine);
         assert_eq!(tokens[1], Token::NewLine);
+    }
+
+    #[test]
+    fn test_system_variable() {
+        let tokens = tokenize("R50=$TC_MPP6[9998,1]");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Word("R50=$TC_MPP6[9998,1]".to_string()));
+    }
+
+    #[test]
+    fn test_r_parameter_assign() {
+        let tokens = tokenize("R101=R101+1");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Word("R101=R101+1".to_string()));
+    }
+
+    #[test]
+    fn test_r_parameter_assign_with_spaces() {
+        let tokens = tokenize("R100 = 5");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(tokens[0], Token::Word("R100=5".to_string()));
+    }
+
+    #[test]
+    fn test_r_parameter_simple() {
+        let tokens = tokenize("G0 R50 X100");
+        assert_eq!(tokens[0], Token::GCode(0));
+        assert_eq!(tokens[1], Token::Word("R50".to_string()));
+        assert_eq!(tokens[2], Token::Axis("X".to_string(), Some(100.0)));
+    }
+
+    #[test]
+    fn test_r_check() {
+        let tokens = tokenize("RCHECK");
+        assert_eq!(tokens[0], Token::Word("RCHECK".to_string()));
     }
 }

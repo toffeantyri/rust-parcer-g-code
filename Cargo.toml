@@ -12,6 +12,10 @@ name = "code_parser"
 name = "editor"
 path = "src/bin/gui_main.rs"
 
+[[bin]]
+name = "debug-tokens"
+path = "src/bin/cli_debug.rs"
+
 [dependencies]
 thiserror = "2.0"
 rfd = "0.15"
