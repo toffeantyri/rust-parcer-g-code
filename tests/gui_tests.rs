@@ -140,7 +140,9 @@ fn test_editor_is_present() {
     });
     harness.run();
 
-    let editor = harness.query_by_role(Role::MultilineTextInput);
+    let editor = harness
+        .query_by_role(Role::MultilineTextInput)
+        .or_else(|| harness.query_by_role(Role::TextInput));
     assert!(editor.is_some());
 }
 

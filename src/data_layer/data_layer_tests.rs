@@ -84,17 +84,17 @@ fn test_pipeline_format_with_validation_error() {
     }))
     .unwrap();
 
-    // Ждём: NotifyUser(Formatting) + NotifyUser(Error) + Idle
+    // Ждём: NotifyUser(Formatting) + Pipeline(Formatted с ошибками) + Idle
     let events: Vec<EditorEvent> = rx.iter().take(3).collect();
     assert_eq!(events.len(), 3);
 
     match &events[1] {
-        EditorEvent::Dialog(DialogEvent::NotifyUser { message, level }) => {
-            assert_eq!(*level, NotifyLevel::Error);
-            assert!(message.contains("Ошибка"));
+        EditorEvent::Pipeline(PipelineEvent::Formatted { content, errors }) => {
+            assert!(content.is_empty()); // контент не меняется
+            assert!(!errors.is_empty()); // но ошибки есть
         }
         _ => panic!(
-            "второе событие — NotifyUser(Error), но получено {:?}",
+            "второе событие — Pipeline::Formatted, но получено {:?}",
             events[1]
         ),
     }

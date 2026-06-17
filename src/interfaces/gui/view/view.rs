@@ -3,7 +3,7 @@
 use std::sync::mpsc;
 use std::time::Instant;
 
-use egui;
+use egui::{text::LayoutJob, Color32, TextStyle};
 
 use crate::data_layer::EditorCommand;
 
@@ -234,7 +234,55 @@ pub fn view_editor(
                         .code_editor()
                         .desired_width(f32::INFINITY)
                         .desired_rows(50)
-                        .font(egui::TextStyle::Monospace),
+                        .font(TextStyle::Monospace)
+                        .layouter(&mut |ui: &egui::Ui, text: &str, _wrap_width: f32| {
+                            let mut job = LayoutJob::default();
+                            let error_lines = &model.error_lines;
+                            let mut char_offset = 0;
+
+                            for (i, _line) in text.split('\n').enumerate() {
+                                let line_num = i + 1;
+                                let bg = if error_lines.contains(&line_num) {
+                                    Color32::from_rgba_premultiplied(200, 0, 0, 40)
+                                } else {
+                                    Color32::TRANSPARENT
+                                };
+
+                                let line_end = text[char_offset..]
+                                    .find('\n')
+                                    .map(|pos| char_offset + pos)
+                                    .unwrap_or(text.len());
+                                let line_str = &text[char_offset..line_end];
+
+                                job.append(
+                                    line_str,
+                                    0.0,
+                                    egui::TextFormat {
+                                        background: bg,
+                                        ..Default::default()
+                                    },
+                                );
+
+                                // Добавляем перенос строки, если это не последняя строка
+                                // или если текст заканчивается на \n
+                                if line_end < text.len() {
+                                    job.append(
+                                        "\n",
+                                        0.0,
+                                        egui::TextFormat {
+                                            background: Color32::TRANSPARENT,
+                                            ..Default::default()
+                                        },
+                                    );
+                                    char_offset = line_end + 1;
+                                } else {
+                                    // Достигли конца текста — следующей итерации не будет
+                                    break;
+                                }
+                            }
+
+                            ui.fonts(|f| f.layout_job(job))
+                        }),
                 );
             });
     });

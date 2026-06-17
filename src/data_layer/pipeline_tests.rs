@@ -8,10 +8,12 @@ use super::*;
 
 #[test]
 fn test_format_code_empty() {
-    // Пустая программа — ошибка валидации
+    // Пустая программа — ошибка валидации, но результат Ok с пустым контентом
     let result = format_code("", 0, true);
-    assert!(result.is_err());
-    assert!(result.unwrap_err().contains("ошибок"));
+    assert!(result.is_ok());
+    let (formatted, errors) = result.unwrap();
+    assert!(formatted.is_empty());
+    assert!(!errors.is_empty());
 }
 
 #[test]
@@ -50,10 +52,12 @@ fn test_format_code_preserves_empty_lines() {
 
 #[test]
 fn test_format_code_with_validation_error() {
-    // Ось X без значения — ошибка валидации
+    // Ось X без значения — ошибка валидации, но результат Ok с пустым контентом
     let result = format_code("G0 X", 0, true);
-    assert!(result.is_err());
-    assert!(result.unwrap_err().contains("ошибок"));
+    assert!(result.is_ok());
+    let (formatted, errors) = result.unwrap();
+    assert!(formatted.is_empty()); // контент не меняется
+    assert!(!errors.is_empty()); // но ошибки есть
 }
 
 #[test]
@@ -111,7 +115,11 @@ fn test_format_text_params() {
     let path = "text_params.txt";
     let input = std::fs::read_to_string(path).expect("Не удалось прочитать text_params.txt");
     let result = format_code(&input, 0, true);
-    assert!(result.is_ok(), "format_code вернул ошибку: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "format_code вернул ошибку: {:?}",
+        result.err()
+    );
     let (formatted, warnings) = result.unwrap();
 
     println!("=== FORMATTED OUTPUT ===");
@@ -125,10 +133,7 @@ fn test_format_text_params() {
     }
 
     assert!(!formatted.is_empty(), "Результат форматирования пуст");
-    assert!(
-        formatted.contains("WHILE"),
-        "Результат не содержит WHILE"
-    );
+    assert!(formatted.contains("WHILE"), "Результат не содержит WHILE");
     assert!(
         formatted.contains("ENDWHILE"),
         "Результат не содержит ENDWHILE"
@@ -140,7 +145,11 @@ fn test_format_text_params_renumber() {
     let path = "text_params.txt";
     let input = std::fs::read_to_string(path).expect("Не удалось прочитать text_params.txt");
     let result = format_code(&input, 10, true);
-    assert!(result.is_ok(), "format_code вернул ошибку: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "format_code вернул ошибку: {:?}",
+        result.err()
+    );
     let (formatted, warnings) = result.unwrap();
 
     println!("=== FORMATTED OUTPUT (renumber_step=10) ===");
@@ -182,10 +191,7 @@ fn test_format_text_params_renumber() {
         }
     }
 
-    assert!(
-        formatted.contains("WHILE"),
-        "Результат не содержит WHILE"
-    );
+    assert!(formatted.contains("WHILE"), "Результат не содержит WHILE");
     assert!(
         formatted.contains("ENDWHILE"),
         "Результат не содержит ENDWHILE"
@@ -241,10 +247,7 @@ fn test_format_input_code() {
                 formatted.contains("MATLRET"),
                 "Результат не содержит 'MATLRET'"
             );
-            assert!(
-                formatted.contains("M17"),
-                "Результат не содержит 'M17'"
-            );
+            assert!(formatted.contains("M17"), "Результат не содержит 'M17'");
         }
         Err(e) => {
             println!("format_code error: {}", e);

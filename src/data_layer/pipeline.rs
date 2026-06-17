@@ -4,6 +4,8 @@ use crate::shared::{Severity, ValidationMessage};
 
 /// Форматирует G-код: лексинг → парсинг → валидация → форматирование.
 /// Возвращает (отформатированная строка, ошибки валидации).
+/// Если есть критические ошибки — контент не меняется (возвращается пустая строка),
+/// но ошибки всё равно возвращаются для подсветки.
 pub fn format_code(
     input: &str,
     renumber_step: u32,
@@ -19,10 +21,8 @@ pub fn format_code(
     let has_errors = errors.iter().any(|e| e.severity == Severity::Error);
 
     if has_errors {
-        return Err(format!(
-            "Найдено {} ошибок. Форматирование отменено.",
-            errors.len()
-        ));
+        // Ошибки есть — возвращаем их для подсветки, но контент не меняем
+        return Ok((String::new(), errors));
     }
 
     let config = crate::application::FormatConfig {

@@ -75,6 +75,9 @@ impl GCodeApp {
                         self.model.content = content;
                         self.model.modified = true;
                     }
+                    // Собираем номера строк с ошибками для подсветки
+                    self.model.error_lines =
+                        errors.iter().map(|e| e.line).filter(|l| *l > 0).collect();
                     if errors.is_empty() {
                         self.model.status = i18n::locale().status.formatted.to_string();
                     } else {
@@ -85,6 +88,9 @@ impl GCodeApp {
                     self.model.is_busy = false;
                 }
                 PipelineEvent::Validated { errors } => {
+                    // Собираем номера строк с ошибками для подсветки
+                    self.model.error_lines =
+                        errors.iter().map(|e| e.line).filter(|l| *l > 0).collect();
                     if errors.is_empty() {
                         self.model.status = i18n::locale().status.no_errors.to_string();
                     } else {
@@ -102,6 +108,7 @@ impl GCodeApp {
                     self.model.modified = false;
                     self.model.is_busy = false;
                     self.model.status = i18n::locale().status.file_opened.to_string();
+                    self.model.error_lines.clear(); // при загрузке нового файла ошибок нет
                 }
                 FileEvent::Saved { file_path } => {
                     self.model.file_path = file_path;
@@ -321,6 +328,11 @@ impl eframe::App for GCodeApp {
             &mut self.last_text_change,
             &mut self.pending_text,
         );
+
+        // Если текст изменился после view_editor — очищаем подсветку ошибок
+        if self.pending_text.is_some() {
+            self.model.error_lines.clear();
+        }
 
         // 4. Если data layer запрашивает file picker — показываем его
         if self.awaiting_picker {

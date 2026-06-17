@@ -27,6 +27,8 @@ pub struct Model {
     pub pending_action: Option<PendingAction>,
     /// Действие, ожидающее завершения сохранения в data layer
     pub save_and_exec: Option<PendingAction>,
+    /// Номера строк с ошибками валидации (1-based)
+    pub error_lines: Vec<usize>,
 }
 
 /// Действие, ожидающее подтверждения пользователя
