@@ -150,3 +150,34 @@ fn test_validate_axis_with_value_is_not_warning() {
     let msgs = validate(&program);
     assert!(msgs.is_empty());
 }
+
+#[test]
+fn test_validate_axis_x_eq_r100_is_ok() {
+    // X=R100 — присвоение переменной R100 оси X, корректная конструкция
+    let tokens = crate::infrastructure::lexer::tokenize("X=R100");
+    let mut parser = crate::application::Parser::new(tokens);
+    let program = parser.parse_program().unwrap();
+    let msgs = validate(&program);
+    assert!(
+        msgs.is_empty(),
+        "X=R100 не должно давать ошибок: {:?}",
+        msgs
+    );
+}
+
+#[test]
+fn test_validate_axis_x_eq_r100_roundtrip() {
+    // Проверка что X=R100 превращается в Statement::Word("X=R100")
+    let tokens = crate::infrastructure::lexer::tokenize("X=R100");
+    let mut parser = crate::application::Parser::new(tokens);
+    let program = parser.parse_program().unwrap();
+    let msgs = validate(&program);
+    assert!(msgs.is_empty());
+    assert_eq!(program.len(), 1);
+    match &program[0] {
+        Statement::Word(w) => {
+            assert_eq!(w, "X=R100");
+        }
+        _ => panic!("Ожидался Statement::Word, получено {:?}", program[0]),
+    }
+}
