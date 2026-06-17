@@ -3,11 +3,14 @@
 use std::sync::mpsc;
 use std::time::Instant;
 
-use egui::{text::LayoutJob, Color32, TextStyle};
+use egui::TextStyle;
 
 use crate::data_layer::EditorCommand;
 
 use crate::shared::i18n;
+
+use crate::domain::Token;
+use crate::infrastructure::lexer::tokenize_with_positions;
 
 use crate::interfaces::gui::intent::Intent;
 use crate::interfaces::gui::model::Model;
@@ -237,53 +240,9 @@ pub fn view_editor(
                         .desired_width(f32::INFINITY)
                         .desired_rows(50)
                         .font(TextStyle::Monospace)
-                        .layouter(&mut |ui: &egui::Ui, text: &str, _wrap_width: f32| {
-                            let mut job = LayoutJob::default();
-                            let error_lines = &model.error_lines();
-                            let mut char_offset = 0;
-
-                            for (i, _line) in text.split('\n').enumerate() {
-                                let line_num = i + 1;
-                                let bg = if error_lines.contains(&line_num) {
-                                    Color32::from_rgba_premultiplied(200, 0, 0, 40)
-                                } else {
-                                    Color32::TRANSPARENT
-                                };
-
-                                let line_end = text[char_offset..]
-                                    .find('\n')
-                                    .map(|pos| char_offset + pos)
-                                    .unwrap_or(text.len());
-                                let line_str = &text[char_offset..line_end];
-
-                                job.append(
-                                    line_str,
-                                    0.0,
-                                    egui::TextFormat {
-                                        background: bg,
-                                        ..Default::default()
-                                    },
-                                );
-
-                                // Добавляем перенос строки, если это не последняя строка
-                                // или если текст заканчивается на \n
-                                if line_end < text.len() {
-                                    job.append(
-                                        "\n",
-                                        0.0,
-                                        egui::TextFormat {
-                                            background: Color32::TRANSPARENT,
-                                            ..Default::default()
-                                        },
-                                    );
-                                    char_offset = line_end + 1;
-                                } else {
-                                    // Достигли конца текста — следующей итерации не будет
-                                    break;
-                                }
-                            }
-
-                            ui.fonts(|f| f.layout_job(job))
+                        .layouter(&mut |_ui: &egui::Ui, text: &str, _wrap_width: f32| {
+                            let job = build_highlighted_job(text, &model.error_lines());
+                            _ui.fonts(|f| f.layout_job(job))
                         }),
                 );
             });
@@ -296,6 +255,113 @@ pub fn view_editor(
         *pending_text = Some(model.content().to_string());
         *last_text_change = Instant::now();
     }
+}
+
+/// Строит LayoutJob с подсветкой синтаксиса для G-кода.
+fn build_highlighted_job(text: &str, error_lines: &[usize]) -> egui::text::LayoutJob {
+    use egui::Color32;
+
+    let mut job = egui::text::LayoutJob::default();
+    let mut tokens = tokenize_with_positions(text);
+
+    // Сортируем по позиции (на случай если лексер вернёт не по порядку)
+    tokens.sort_by_key(|t| t.start);
+
+    // Цвета для разных типов токенов
+    fn token_color(token: &Token) -> Color32 {
+        match token {
+            // Зелёный — салатовый
+            Token::GCode(_) => Color32::from_rgb(120, 210, 100),
+            // Синий — чуть темнее
+            Token::MCode(_) => Color32::from_rgb(50, 120, 200),
+            // Жёлтый — светлее
+            Token::Axis(_, _, _) => Color32::from_rgb(220, 210, 80),
+            Token::AxisExpr(_, _) => Color32::from_rgb(180, 150, 30),
+            Token::Comment(_) => Color32::from_rgb(140, 140, 140),
+            Token::Word(w) => {
+                let upper = w.to_uppercase();
+                if upper == "WHILE"
+                    || upper == "IF"
+                    || upper == "ELSE"
+                    || upper == "ENDWHILE"
+                    || upper == "ENDIF"
+                    || upper == "REPEAT"
+                    || upper == "UNTIL"
+                {
+                    Color32::from_rgb(200, 100, 100)
+                } else {
+                    Color32::from_rgb(200, 80, 80)
+                }
+            }
+            Token::Unknown(_) => Color32::from_rgb(200, 50, 50),
+            _ => Color32::WHITE,
+        }
+    }
+
+    fn line_bg(line_num: usize, error_lines: &[usize]) -> Color32 {
+        if error_lines.contains(&line_num) {
+            Color32::from_rgba_premultiplied(200, 0, 0, 40)
+        } else {
+            Color32::TRANSPARENT
+        }
+    }
+
+    let mut current_pos = 0;
+    let mut current_line: usize = 1;
+
+    for tp in &tokens {
+        // Если есть пропуск между токенами (пробелы) — добавляем их без подсветки
+        if tp.start > current_pos {
+            let gap = &text[current_pos..tp.start];
+            // Считаем строки в пропуске
+            for c in gap.chars() {
+                if c == '\n' {
+                    current_line += 1;
+                }
+            }
+            job.append(
+                gap,
+                0.0,
+                egui::TextFormat {
+                    background: line_bg(current_line, error_lines),
+                    ..Default::default()
+                },
+            );
+        }
+
+        // Подсветка самого токена
+        let token_text = &text[tp.start..tp.end];
+        // Считаем переносы строк внутри токена (для NewLine)
+        if tp.token == Token::NewLine {
+            current_line += 1;
+        }
+        job.append(
+            token_text,
+            0.0,
+            egui::TextFormat {
+                color: token_color(&tp.token),
+                background: line_bg(current_line, error_lines),
+                ..Default::default()
+            },
+        );
+
+        current_pos = tp.end;
+    }
+
+    // Если после последнего токена есть остаток текста
+    if current_pos < text.len() {
+        let remaining = &text[current_pos..];
+        job.append(
+            remaining,
+            0.0,
+            egui::TextFormat {
+                background: line_bg(current_line, error_lines),
+                ..Default::default()
+            },
+        );
+    }
+
+    job
 }
 
 /// Отрисовывает диалог подтверждения выхода/закрытия.

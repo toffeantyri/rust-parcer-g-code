@@ -2,7 +2,7 @@
 //!
 //! Реализует доменный контракт Lexer.
 
-use crate::domain::{Lexer, Token};
+use crate::domain::{Lexer, Token, TokenPosition};
 
 /// Стандартный лексер для G-кода.
 /// Реализует доменный трейт Lexer.
@@ -113,6 +113,18 @@ impl LexerInner {
 
         self.read_char();
         Token::Unknown(ch)
+    }
+
+    /// Возвращает следующий токен вместе с его позицией в исходном тексте
+    pub fn next_token_with_position(&mut self) -> TokenPosition {
+        let start = self.position;
+        let token = self.next_token();
+        let end = if token == Token::Eof {
+            start
+        } else {
+            self.position
+        };
+        TokenPosition { token, start, end }
     }
 
     /// Читает буквенное слово и определяет его тип
@@ -377,6 +389,20 @@ pub fn tokenize(input: &str) -> Vec<Token> {
             break;
         }
         tokens.push(token);
+    }
+    tokens
+}
+
+/// Токенизирует строку и возвращает токены с позициями для подсветки
+pub fn tokenize_with_positions(input: &str) -> Vec<TokenPosition> {
+    let mut lexer = LexerInner::new(input.to_string());
+    let mut tokens = Vec::new();
+    loop {
+        let tp = lexer.next_token_with_position();
+        if tp.token == Token::Eof {
+            break;
+        }
+        tokens.push(tp);
     }
     tokens
 }
