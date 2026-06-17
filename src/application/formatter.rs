@@ -51,107 +51,62 @@ impl Formatter {
     }
 
     pub fn format_program(&self, program: &[Statement]) -> String {
-        self.format_block(program, 0)
+        let formatted = self.format_block(program, 0);
+        if self.config.renumber_step > 0 {
+            apply_renumbering(
+                &formatted,
+                self.config.renumber_step,
+                self.config.skip_empty_lines,
+            )
+        } else {
+            formatted
+        }
     }
 
     fn format_block(&self, program: &[Statement], indent_level: usize) -> String {
         let mut result = String::new();
         let mut line_parts: Vec<String> = Vec::new();
-        let mut current_n: u32 = 0;
-        let mut line_has_ncode = false;
 
         for stmt in program {
             match stmt {
                 Statement::WhileBlock(w) => {
-                    // Если в line_parts только N-код и включена перенумерация
-                    // со skip_empty_lines — удаляем N-код, оставляем пустую строку
                     if !line_parts.is_empty() {
-                        let has_only_ncode = line_has_ncode && line_parts.len() == 1;
-                        if self.config.renumber_step > 0
-                            && self.config.skip_empty_lines
-                            && has_only_ncode
-                        {
-                            result.push('\n');
-                        } else {
-                            result.push_str(&self.format_line(&line_parts));
-                        }
+                        result.push_str(&self.format_line(&line_parts));
                         line_parts.clear();
-                        line_has_ncode = false;
                     }
                     result.push_str(&self.format_while(w, indent_level));
                 }
                 Statement::IfBlock(i) => {
                     if !line_parts.is_empty() {
-                        let has_only_ncode = line_has_ncode && line_parts.len() == 1;
-                        if self.config.renumber_step > 0
-                            && self.config.skip_empty_lines
-                            && has_only_ncode
-                        {
-                            result.push('\n');
-                        } else {
-                            result.push_str(&self.format_line(&line_parts));
-                        }
+                        result.push_str(&self.format_line(&line_parts));
                         line_parts.clear();
-                        line_has_ncode = false;
                     }
                     result.push_str(&self.format_if(i, indent_level));
                 }
                 Statement::NewLine => {
                     if !line_parts.is_empty() {
-                        let has_only_ncode = line_has_ncode && line_parts.len() == 1;
-                        if self.config.renumber_step > 0
-                            && has_only_ncode
-                            && self.config.skip_empty_lines
-                        {
-                            line_parts.clear();
-                            result.push('\n');
-                        } else {
-                            result.push_str(&self.format_line(&line_parts));
-                            line_parts.clear();
-                        }
-                        line_has_ncode = false;
+                        result.push_str(&self.format_line(&line_parts));
+                        line_parts.clear();
                     } else {
-                        if self.config.renumber_step > 0 && !self.config.skip_empty_lines {
-                            current_n += self.config.renumber_step;
-                            result.push_str(&format!("N{}\n", current_n));
-                        } else {
-                            result.push('\n');
-                        }
+                        result.push('\n');
                     }
                 }
                 Statement::NCode(_code) => {
-                    if self.config.renumber_step > 0 {
-                        current_n += self.config.renumber_step;
-                        if !line_parts.is_empty() {
-                            result.push_str(&self.format_line(&line_parts));
-                            line_parts.clear();
-                        }
-                        line_parts.push(format!("N{}", current_n));
-                        line_has_ncode = true;
-                    } else {
-                        if !line_parts.is_empty() {
-                            result.push_str(&self.format_line(&line_parts));
-                            line_parts.clear();
-                        }
-                        line_parts.push(self.format_statement(stmt));
-                        line_has_ncode = true;
+                    if !line_parts.is_empty() {
+                        result.push_str(&self.format_line(&line_parts));
+                        line_parts.clear();
                     }
+                    line_parts.push(self.format_statement(stmt));
                 }
                 Statement::Raw(raw) => {
                     if !line_parts.is_empty() {
                         result.push_str(&self.format_line(&line_parts));
                         line_parts.clear();
-                        line_has_ncode = false;
                     }
                     result.push_str(raw);
                     result.push('\n');
                 }
                 _ => {
-                    if self.config.renumber_step > 0 && line_parts.is_empty() && !line_has_ncode {
-                        current_n += self.config.renumber_step;
-                        line_parts.push(format!("N{}", current_n));
-                        line_has_ncode = true;
-                    }
                     line_parts.push(self.format_statement(stmt));
                 }
             }
@@ -174,18 +129,7 @@ impl Formatter {
 
         // Тело
         let body = self.format_block(&w.body, indent_level + 1);
-        let mut lines: Vec<&str> = body.lines().collect();
-        // Убираем trailing N-коды перед ENDWHILE
-        if self.config.skip_empty_lines {
-            while let Some(last) = lines.last() {
-                let trimmed = last.trim();
-                if trimmed.is_empty() || Self::is_only_ncode(trimmed) {
-                    lines.pop();
-                } else {
-                    break;
-                }
-            }
-        }
+        let lines: Vec<&str> = body.lines().collect();
         for line in &lines {
             if line.trim().is_empty() {
                 out.push('\n');
@@ -210,18 +154,8 @@ impl Formatter {
 
         // THEN
         let then_body = self.format_block(&i.then_body, indent_level + 1);
-        let mut lines: Vec<&str> = then_body.lines().collect();
-        if self.config.skip_empty_lines {
-            while let Some(last) = lines.last() {
-                let trimmed = last.trim();
-                if trimmed.is_empty() || Self::is_only_ncode(trimmed) {
-                    lines.pop();
-                } else {
-                    break;
-                }
-            }
-        }
-        for line in &lines {
+        let then_lines: Vec<&str> = then_body.lines().collect();
+        for line in &then_lines {
             if line.trim().is_empty() {
                 out.push('\n');
             } else {
@@ -233,18 +167,8 @@ impl Formatter {
         if let Some(ref else_body) = i.else_body {
             out.push_str(&format!("{}ELSE\n", indent));
             let else_fmt = self.format_block(else_body, indent_level + 1);
-            let mut lines: Vec<&str> = else_fmt.lines().collect();
-            if self.config.skip_empty_lines {
-                while let Some(last) = lines.last() {
-                    let trimmed = last.trim();
-                    if trimmed.is_empty() || Self::is_only_ncode(trimmed) {
-                        lines.pop();
-                    } else {
-                        break;
-                    }
-                }
-            }
-            for line in &lines {
+            let else_lines: Vec<&str> = else_fmt.lines().collect();
+            for line in &else_lines {
                 if line.trim().is_empty() {
                     out.push('\n');
                 } else {
@@ -316,12 +240,77 @@ impl Formatter {
     fn format_line(&self, parts: &[String]) -> String {
         format!("{}\n", parts.join(" "))
     }
+}
 
-    /// Проверяет, состоит ли строка только из N-кода (например "N0440")
-    fn is_only_ncode(s: &str) -> bool {
-        let s = s.trim();
-        s.len() >= 2 && s.starts_with('N') && s[1..].chars().all(|c| c.is_ascii_digit())
+/// Удаляет N-код из начала строки, если он есть
+fn trim_ncode(s: &str) -> &str {
+    let s = s.trim_start();
+    if s.starts_with('N') || s.starts_with('n') {
+        // Пропускаем букву N/n и цифры
+        let after_n = &s[1..];
+        let digits: usize = after_n.chars().take_while(|c| c.is_ascii_digit()).count();
+        if digits > 0 {
+            &s[1 + digits..]
+        } else {
+            s
+        }
+    } else {
+        s
     }
+}
+
+fn apply_renumbering(text: &str, step: u32, skip_empty_lines: bool) -> String {
+    let mut result = String::new();
+    let mut current_n: u32 = 0;
+
+    for line in text.lines() {
+        let trimmed = line.trim();
+
+        // Пустая строка — нумеруем если skip_empty_lines=false
+        if trimmed.is_empty() {
+            if !skip_empty_lines {
+                current_n += step;
+                result.push_str(&format!("N{}\n", current_n));
+            } else {
+                result.push('\n');
+            }
+            continue;
+        }
+
+        // Если строка содержит только комментарий (начинается с ;) — не нумеруем
+        if trimmed.starts_with(';') {
+            result.push_str(line);
+            result.push('\n');
+            continue;
+        }
+
+        // Skip empty lines: если строка содержит только старый N-код и больше ничего — удаляем N-код
+        if skip_empty_lines {
+            let without_n = trim_ncode(trimmed);
+            let after_n = without_n.trim();
+            if after_n.is_empty() {
+                // Была строка только с N-кодом — удаляем, но счётчик увеличиваем
+                // и оставляем пустую строку
+                current_n += step;
+                result.push('\n');
+                continue;
+            }
+            // Если после удаления N-кода остался только комментарий — не нумеруем
+            if after_n.starts_with(';') {
+                result.push_str(without_n.trim_start());
+                result.push('\n');
+                continue;
+            }
+        }
+
+        // Удаляем старый N-код из начала строки
+        let clean_line = trim_ncode(line);
+
+        current_n += step;
+        result.push_str(&format!("N{} {}\n", current_n, clean_line.trim()));
+    }
+
+    result
 }
 
 #[cfg(test)]

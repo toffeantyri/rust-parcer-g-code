@@ -274,6 +274,12 @@ fn test_format_text_params() {
         }
     }
 
+    // Проверка: WHILE блок должен содержать RParameter
+    assert!(
+        formatted.contains("R101=R101+1"),
+        "WHILE блок должен содержать R101=R101+1"
+    );
+
     assert!(!formatted.is_empty(), "Результат форматирования пуст");
     assert!(formatted.contains("WHILE"), "Результат не содержит WHILE");
     assert!(
