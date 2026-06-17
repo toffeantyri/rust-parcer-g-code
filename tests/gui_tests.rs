@@ -105,10 +105,8 @@ fn test_toolbar_buttons() {
 #[test]
 fn test_toolbar_buttons_disabled_when_busy() {
     i18n::set_lang("en");
-    let model = Model {
-        is_busy: true,
-        ..Default::default()
-    };
+    let mut model = Model::default();
+    model.set_is_busy(true);
 
     let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
         let _intents = collect_intents(ui.ctx(), false, &model);
@@ -150,7 +148,7 @@ fn test_editor_is_present() {
 fn test_editor_shows_content() {
     i18n::set_lang("en");
     let mut model = Model::default();
-    model.content = "G0 X10 Y20\nG1 Z5.5".to_string();
+    model.set_content("G0 X10 Y20\nG1 Z5.5".to_string());
 
     let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
         let mut last_change = std::time::Instant::now();
@@ -176,10 +174,8 @@ fn test_editor_shows_content() {
 #[test]
 fn test_status_bar_shows_ready() {
     i18n::set_lang("en");
-    let model = Model {
-        status: i18n::locale().status.ready.clone(),
-        ..Default::default()
-    };
+    let mut model = Model::default();
+    model.set_status(i18n::locale().status.ready.clone());
 
     let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
         view_statusbar(&model, ui.ctx());
@@ -198,13 +194,11 @@ fn test_status_bar_shows_ready() {
 #[test]
 fn test_exit_dialog_shown_when_flag_set() {
     i18n::set_lang("en");
-    let model = Model {
-        show_exit_dialog: true,
-        content: "G0 X10".to_string(),
-        file_path: "/path.nc".to_string(),
-        modified: true,
-        ..Default::default()
-    };
+    let mut model = Model::default();
+    model.set_show_exit_dialog(true);
+    model.set_content("G0 X10".to_string());
+    model.set_file_path("/path.nc".to_string());
+    model.set_modified(true);
 
     let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
         let _intents = view_exit_dialog(&model, ui.ctx());
@@ -237,10 +231,8 @@ fn test_exit_dialog_not_shown_without_flag() {
 #[test]
 fn test_settings_window_shown_when_open() {
     i18n::set_lang("en");
-    let model = Model {
-        settings_open: true,
-        ..Default::default()
-    };
+    let mut model = Model::default();
+    model.set_settings_open(true);
 
     let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
         let _intents = view_settings(&model, ui.ctx());
@@ -268,14 +260,12 @@ fn test_settings_window_not_shown_by_default() {
 #[test]
 fn test_settings_window_skip_empty_checkbox() {
     i18n::set_lang("en");
-    let model = Model {
-        settings_open: true,
-        format_settings: FormatSettings {
-            skip_empty_lines: false,
-            ..Default::default()
-        },
+    let mut model = Model::default();
+    model.set_settings_open(true);
+    model.set_format_settings(FormatSettings {
+        skip_empty_lines: false,
         ..Default::default()
-    };
+    });
 
     let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
         let _intents = view_settings(&model, ui.ctx());
@@ -293,13 +283,11 @@ fn test_settings_window_skip_empty_checkbox() {
 #[test]
 fn test_settings_menu_language_toggle() {
     i18n::set_lang("ru");
-    let model = Model {
-        format_settings: FormatSettings {
-            language: "ru".to_string(),
-            ..Default::default()
-        },
+    let mut model = Model::default();
+    model.set_format_settings(FormatSettings {
+        language: "ru".to_string(),
         ..Default::default()
-    };
+    });
 
     let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
         let _intents = collect_intents(ui.ctx(), false, &model);
@@ -322,10 +310,8 @@ fn test_settings_menu_language_toggle() {
 #[test]
 fn test_shortcuts_window_shown_when_open() {
     i18n::set_lang("en");
-    let model = Model {
-        shortcuts_open: true,
-        ..Default::default()
-    };
+    let mut model = Model::default();
+    model.set_shortcuts_open(true);
 
     let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
         let _intents = view_shortcuts(&model, ui.ctx());
@@ -355,10 +341,8 @@ fn test_shortcuts_window_not_shown_by_default() {
 #[test]
 fn test_shortcuts_window_shown_russian() {
     i18n::set_lang("ru");
-    let model = Model {
-        shortcuts_open: true,
-        ..Default::default()
-    };
+    let mut model = Model::default();
+    model.set_shortcuts_open(true);
 
     let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
         let _intents = view_shortcuts(&model, ui.ctx());
@@ -370,4 +354,31 @@ fn test_shortcuts_window_shown_russian() {
             || harness.query_by_label("Ctrl+O").is_some()
     );
     assert!(harness.query_by_label("Ctrl+S").is_some());
+}
+
+// ---------------------------------------------------------------------------
+// Error lines — проверка, что error_lines заполняется после Validate
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_validate_fills_error_lines() {
+    i18n::set_lang("en");
+    let mut model = Model::default();
+    model.set_content("G0 X".to_string()); // ось X без значения — ошибка
+
+    // Имитируем событие Validated, как это делает app.rs::handle_event
+    let err = code_parser::shared::ValidationMessage::error(1, "ось X без значения");
+
+    // Создаём GCodeApp, но напрямую вызываем handle_event
+    let (tx, _) = std::sync::mpsc::channel();
+    let (_evt_tx, evt_rx) = std::sync::mpsc::channel();
+    let mut app = code_parser::interfaces::gui::GCodeApp::new(tx, evt_rx);
+    app.model.set_content("G0 X".to_string());
+
+    app.handle_event(code_parser::data_layer::EditorEvent::Pipeline(
+        code_parser::data_layer::PipelineEvent::Validated { errors: vec![err] },
+    ));
+
+    assert!(!app.model.error_lines().is_empty());
+    assert_eq!(app.model.error_lines(), vec![1]);
 }

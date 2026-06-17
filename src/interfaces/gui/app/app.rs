@@ -9,15 +9,16 @@ use crate::data_layer::{
     DialogCommand, DialogEvent, EditorCommand, EditorEvent, FileCommand, FileEvent,
     PipelineCommand, PipelineEvent,
 };
+use crate::interfaces::gui::model::PendingAction;
 use crate::shared::i18n;
 
 use crate::interfaces::gui::intent::Intent;
-use crate::interfaces::gui::model::{Model, PendingAction};
+use crate::interfaces::gui::model::Model;
 use crate::interfaces::gui::view;
 
 /// Главное приложение G-Code Editor.
 pub struct GCodeApp {
-    pub(crate) model: Model,
+    pub model: Model,
     cmd_tx: mpsc::Sender<EditorCommand>,
     evt_rx: mpsc::Receiver<EditorEvent>,
     /// Последнее время отправки TextChanged (для coalesce).
@@ -32,12 +33,10 @@ pub struct GCodeApp {
 
 impl GCodeApp {
     pub fn new(cmd_tx: mpsc::Sender<EditorCommand>, evt_rx: mpsc::Receiver<EditorEvent>) -> Self {
-        let mut model = Model {
-            status: i18n::locale().status.ready.to_string(),
-            ..Default::default()
-        };
+        let mut model = Model::default();
+        model.set_status(i18n::locale().status.ready.to_string());
         model.load_settings();
-        i18n::set_lang(&model.format_settings.language);
+        i18n::set_lang(&model.format_settings().language);
         Self {
             model,
             cmd_tx,
@@ -65,73 +64,85 @@ impl GCodeApp {
         }
     }
 
-    /// Обрабатывает событие от data layer: мутирует модель.
-    /// Вынесено из update() для тестирования.
     pub fn handle_event(&mut self, event: EditorEvent) {
         match event {
             EditorEvent::Pipeline(pe) => match pe {
                 PipelineEvent::Formatted { content, errors } => {
                     if !content.is_empty() {
-                        self.model.content = content;
-                        self.model.modified = true;
+                        self.model.set_content(content);
+                        self.model.set_modified(true);
                     }
                     // Собираем номера строк с ошибками для подсветки
-                    self.model.error_lines =
-                        errors.iter().map(|e| e.line).filter(|l| *l > 0).collect();
+                    self.model.set_error_lines(
+                        errors.iter().map(|e| e.line).filter(|l| *l > 0).collect(),
+                    );
                     if errors.is_empty() {
-                        self.model.status = i18n::locale().status.formatted.to_string();
+                        self.model
+                            .set_status(i18n::locale().status.formatted.to_string());
                     } else {
                         let first = &errors[0];
-                        self.model.status =
-                            i18n::fmt_errors_found(errors.len(), &first.message, first.line);
+                        self.model.set_status(i18n::fmt_errors_found(
+                            errors.len(),
+                            &first.message,
+                            first.line,
+                        ));
                     }
-                    self.model.is_busy = false;
+                    self.model.set_is_busy(false);
                 }
                 PipelineEvent::Validated { errors } => {
                     // Собираем номера строк с ошибками для подсветки
-                    self.model.error_lines =
-                        errors.iter().map(|e| e.line).filter(|l| *l > 0).collect();
+                    self.model.set_error_lines(
+                        errors.iter().map(|e| e.line).filter(|l| *l > 0).collect(),
+                    );
                     if errors.is_empty() {
-                        self.model.status = i18n::locale().status.no_errors.to_string();
+                        self.model
+                            .set_status(i18n::locale().status.no_errors.to_string());
                     } else {
                         let first = &errors[0];
-                        self.model.status =
-                            i18n::fmt_errors_found(errors.len(), &first.message, first.line);
+                        self.model.set_status(i18n::fmt_errors_found(
+                            errors.len(),
+                            &first.message,
+                            first.line,
+                        ));
                     }
-                    self.model.is_busy = false;
+                    self.model.set_is_busy(false);
                 }
             },
             EditorEvent::File(fe) => match fe {
                 FileEvent::Loaded { content, file_path } => {
-                    self.model.content = content;
-                    self.model.file_path = file_path;
-                    self.model.modified = false;
-                    self.model.is_busy = false;
-                    self.model.status = i18n::locale().status.file_opened.to_string();
-                    self.model.error_lines.clear(); // при загрузке нового файла ошибок нет
+                    self.model.set_content(content);
+                    self.model.set_file_path(file_path);
+                    self.model.set_modified(false);
+                    self.model.set_is_busy(false);
+                    self.model
+                        .set_status(i18n::locale().status.file_opened.to_string());
+                    self.model.set_error_lines(Vec::new()); // при загрузке нового файла ошибок нет
                 }
                 FileEvent::Saved { file_path } => {
-                    self.model.file_path = file_path;
-                    self.model.modified = false;
-                    self.model.is_busy = false;
-                    match self.model.save_and_exec.take() {
+                    self.model.set_file_path(file_path);
+                    self.model.set_modified(false);
+                    self.model.set_is_busy(false);
+                    match self.model.save_and_exec().cloned() {
                         Some(PendingAction::Exit) => {
                             std::process::exit(0);
                         }
                         Some(PendingAction::CloseFile) => {
-                            self.model.content.clear();
-                            self.model.file_path.clear();
-                            self.model.modified = false;
-                            self.model.status = i18n::locale().status.file_closed.to_string();
+                            self.model.set_content(String::new());
+                            self.model.set_file_path(String::new());
+                            self.model.set_modified(false);
+                            self.model
+                                .set_status(i18n::locale().status.file_closed.to_string());
                         }
                         Some(PendingAction::OpenNewFile) => {
-                            self.model.is_busy = true;
+                            self.model.set_is_busy(true);
                             let _ = self.cmd_tx.send(EditorCommand::File(FileCommand::OpenFile));
                         }
                         None => {
-                            self.model.status = i18n::locale().status.saved.to_string();
+                            self.model
+                                .set_status(i18n::locale().status.saved.to_string());
                         }
                     }
+                    self.model.set_save_and_exec(None);
                 }
             },
             EditorEvent::Dialog(de) => match de {
@@ -150,10 +161,10 @@ impl GCodeApp {
                     self.awaiting_dialog = true;
                 }
                 DialogEvent::NotifyUser { message, level: _ } => {
-                    self.model.status = message;
+                    self.model.set_status(message);
                 }
                 DialogEvent::Idle => {
-                    self.model.is_busy = false;
+                    self.model.set_is_busy(false);
                 }
             },
         }
@@ -165,13 +176,15 @@ impl GCodeApp {
     pub fn handle_intent(&mut self, intent: &Intent) {
         match intent {
             Intent::Format => {
-                if self.model.content.is_empty() {
-                    self.model.status = i18n::locale().status.empty_editor.to_string();
+                if self.model.content().is_empty() {
+                    self.model
+                        .set_status(i18n::locale().status.empty_editor.to_string());
                 } else {
-                    self.model.status = i18n::locale().status.formatting.to_string();
-                    self.model.is_busy = true;
-                    let settings = self.model.format_settings.clone();
-                    let content = self.model.content.clone();
+                    self.model
+                        .set_status(i18n::locale().status.formatting.to_string());
+                    self.model.set_is_busy(true);
+                    let settings = self.model.format_settings().clone();
+                    let content = self.model.content().to_string();
                     let _ = self
                         .cmd_tx
                         .send(EditorCommand::Pipeline(PipelineCommand::Format {
@@ -182,76 +195,82 @@ impl GCodeApp {
                 }
             }
             Intent::Validate => {
-                if self.model.content.is_empty() {
-                    self.model.status = i18n::locale().status.empty_validate.to_string();
+                if self.model.content().is_empty() {
+                    self.model
+                        .set_status(i18n::locale().status.empty_validate.to_string());
                 } else {
-                    self.model.status = i18n::locale().status.validating.to_string();
-                    self.model.is_busy = true;
+                    self.model
+                        .set_status(i18n::locale().status.validating.to_string());
+                    self.model.set_is_busy(true);
                     let _ = self
                         .cmd_tx
                         .send(EditorCommand::Pipeline(PipelineCommand::Validate(
-                            self.model.content.clone(),
+                            self.model.content().to_string(),
                         )));
                 }
             }
             Intent::OpenFile => {
-                if self.model.modified && !self.model.file_path.is_empty() {
-                    self.model.show_exit_dialog = true;
-                    self.model.pending_action = Some(PendingAction::OpenNewFile);
+                if self.model.modified() && !self.model.file_path().is_empty() {
+                    self.model.set_show_exit_dialog(true);
+                    self.model
+                        .set_pending_action(Some(PendingAction::OpenNewFile));
                 } else {
-                    self.model.is_busy = true;
+                    self.model.set_is_busy(true);
                     let _ = self.cmd_tx.send(EditorCommand::File(FileCommand::OpenFile));
                 }
             }
             Intent::SaveFile => {
-                if self.model.file_path.is_empty() {
-                    self.model.is_busy = true;
+                if self.model.file_path().is_empty() {
+                    self.model.set_is_busy(true);
                     let _ = self.cmd_tx.send(EditorCommand::File(FileCommand::SaveFile {
                         path: None,
-                        content: self.model.content.clone(),
+                        content: self.model.content().to_string(),
                     }));
                 } else {
-                    let path = self.model.file_path.clone();
-                    self.model.is_busy = true;
+                    let path = self.model.file_path().to_string();
+                    self.model.set_is_busy(true);
                     let _ = self.cmd_tx.send(EditorCommand::File(FileCommand::SaveFile {
                         path: Some(path),
-                        content: self.model.content.clone(),
+                        content: self.model.content().to_string(),
                     }));
                 }
             }
             Intent::SaveAs => {
-                self.model.is_busy = true;
+                self.model.set_is_busy(true);
                 let _ = self.cmd_tx.send(EditorCommand::File(FileCommand::SaveFile {
                     path: None,
-                    content: self.model.content.clone(),
+                    content: self.model.content().to_string(),
                 }));
             }
             Intent::ConfirmSave => {
-                self.model.show_exit_dialog = false;
-                self.model.save_and_exec = self.model.pending_action.take();
-                let path = if self.model.file_path.is_empty() {
+                self.model.set_show_exit_dialog(false);
+                self.model
+                    .set_save_and_exec(self.model.pending_action().cloned());
+                let path = if self.model.file_path().is_empty() {
                     None
                 } else {
-                    Some(self.model.file_path.clone())
+                    Some(self.model.file_path().to_string())
                 };
-                let content = std::mem::take(&mut self.model.content);
+                let content = self.model.content().to_string();
                 let _ = self
                     .cmd_tx
                     .send(EditorCommand::File(FileCommand::SaveFile { path, content }));
             }
             Intent::DiscardAndContinue => {
-                self.model.show_exit_dialog = false;
-                self.model.modified = false;
-                let action = self.model.pending_action.take();
+                self.model.set_show_exit_dialog(false);
+                self.model.set_modified(false);
+                let action = self.model.pending_action().cloned();
+                self.model.set_pending_action(None);
                 match action {
                     Some(PendingAction::Exit) => std::process::exit(0),
                     Some(PendingAction::CloseFile) => {
-                        self.model.content.clear();
-                        self.model.file_path.clear();
-                        self.model.status = i18n::locale().status.file_closed.to_string();
+                        self.model.set_content(String::new());
+                        self.model.set_file_path(String::new());
+                        self.model
+                            .set_status(i18n::locale().status.file_closed.to_string());
                     }
                     Some(PendingAction::OpenNewFile) => {
-                        self.model.is_busy = true;
+                        self.model.set_is_busy(true);
                         let _ = self.cmd_tx.send(EditorCommand::File(FileCommand::OpenFile));
                     }
                     None => {}
@@ -266,14 +285,14 @@ impl GCodeApp {
 
 impl eframe::App for GCodeApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let is_busy = self.model.is_busy;
+        let is_busy = self.model.is_busy();
 
         // === Проверка на закрытие окна ===
         if ctx.input(|i| i.viewport().close_requested()) {
-            if self.model.modified && !self.model.file_path.is_empty() {
+            if self.model.modified() && !self.model.file_path().is_empty() {
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-                self.model.show_exit_dialog = true;
-                self.model.pending_action = Some(PendingAction::Exit);
+                self.model.set_show_exit_dialog(true);
+                self.model.set_pending_action(Some(PendingAction::Exit));
             }
         }
 
@@ -331,7 +350,7 @@ impl eframe::App for GCodeApp {
 
         // Если текст изменился после view_editor — очищаем подсветку ошибок
         if self.pending_text.is_some() {
-            self.model.error_lines.clear();
+            self.model.set_error_lines(Vec::new());
         }
 
         // 4. Если data layer запрашивает file picker — показываем его
@@ -357,7 +376,7 @@ impl eframe::App for GCodeApp {
         }
 
         // Repaint для спиннера и coalesce
-        if self.model.is_busy || self.pending_text.is_some() {
+        if self.model.is_busy() || self.pending_text.is_some() {
             ctx.request_repaint_after(std::time::Duration::from_millis(50));
         }
     }

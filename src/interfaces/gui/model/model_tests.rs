@@ -11,15 +11,15 @@ fn test_format_settings_default() {
 #[test]
 fn test_model_default() {
     let m = Model::default();
-    assert!(m.content.is_empty());
-    assert!(m.file_path.is_empty());
-    assert!(!m.is_busy);
-    assert!(!m.settings_open);
-    assert!(!m.modified);
-    assert!(!m.show_exit_dialog);
-    assert_eq!(m.pending_action, None);
-    assert_eq!(m.save_and_exec, None);
-    assert_eq!(m.format_settings.renumber_step, 1);
+    assert!(m.content().is_empty());
+    assert!(m.file_path().is_empty());
+    assert!(!m.is_busy());
+    assert!(!m.settings_open());
+    assert!(!m.modified());
+    assert!(!m.show_exit_dialog());
+    assert_eq!(m.pending_action(), None);
+    assert_eq!(m.save_and_exec(), None);
+    assert_eq!(m.format_settings().renumber_step, 1);
 }
 
 #[test]

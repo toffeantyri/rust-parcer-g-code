@@ -69,6 +69,16 @@ fn test_format_code_invalid_syntax() {
     assert!(!formatted.is_empty());
 }
 
+#[test]
+fn test_format_code_with_multiple_errors() {
+    // Две оси без значений на разных строках — две ошибки
+    let result = format_code("X\nY", 0, true);
+    assert!(result.is_ok());
+    let (formatted, errors) = result.unwrap();
+    assert!(formatted.is_empty());
+    assert_eq!(errors.len(), 2);
+}
+
 // -----------------------------------------------------------------------
 // validate_code
 // -----------------------------------------------------------------------

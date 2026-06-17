@@ -72,7 +72,7 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &Model) -> Vec
                 }
             });
             ui.menu_button(&i18n::locale().menu.settings, |ui| {
-                let is_ru = model.format_settings.language == "ru";
+                let is_ru = model.format_settings().language == "ru";
                 if ui
                     .selectable_label(is_ru, &i18n::locale().menu.lang_ru)
                     .clicked()
@@ -80,7 +80,7 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &Model) -> Vec
                 {
                     intents.push(Intent::SetLanguage("ru".to_string()));
                 }
-                let is_en = model.format_settings.language == "en";
+                let is_en = model.format_settings().language == "en";
                 if ui
                     .selectable_label(is_en, &i18n::locale().menu.lang_en)
                     .clicked()
@@ -130,7 +130,7 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &Model) -> Vec
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.label(
-                    egui::RichText::new(&model.file_path)
+                    egui::RichText::new(model.file_path())
                         .size(12.0)
                         .color(egui::Color32::GRAY),
                 );
@@ -145,8 +145,8 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &Model) -> Vec
 pub fn view_statusbar(model: &Model, ctx: &egui::Context) {
     egui::TopBottomPanel::bottom("status_bar").show(ctx, |ui| {
         ui.horizontal(|ui| {
-            let mut status = model.status.clone();
-            if model.is_busy {
+            let mut status = model.status().to_string();
+            if model.is_busy() {
                 let dots = ((ctx.input(|i| i.time) * 4.0) as usize) % 4;
                 status.push_str(" ");
                 for i in 0..3 {
@@ -172,7 +172,7 @@ pub fn view_statusbar(model: &Model, ctx: &egui::Context) {
 /// Отрисовывает окно настроек форматирования.
 pub fn view_settings(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
     let mut intents = Vec::new();
-    let mut open_copy = model.settings_open;
+    let mut open_copy = model.settings_open();
 
     if !open_copy {
         return intents;
@@ -186,7 +186,7 @@ pub fn view_settings(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
             ui.label(&i18n::locale().settings.renumber_step);
             ui.horizontal(|ui| {
                 for &step in &[1u32, 10, 100] {
-                    let selected = model.format_settings.renumber_step == step;
+                    let selected = model.format_settings().renumber_step == step;
                     if ui.selectable_label(selected, format!("{}", step)).clicked() {
                         intents.push(Intent::SetRenumberStep(step));
                     }
@@ -194,10 +194,10 @@ pub fn view_settings(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
             });
             ui.add_space(8.0);
             ui.label(&i18n::locale().settings.examples);
-            let step = model.format_settings.renumber_step;
+            let step = model.format_settings().renumber_step;
             ui.label(format!("N{} N{} N{} ...", step, step * 2, step * 3));
             ui.add_space(12.0);
-            let mut skip = model.format_settings.skip_empty_lines;
+            let mut skip = model.format_settings().skip_empty_lines;
             if ui
                 .checkbox(&mut skip, &i18n::locale().settings.skip_empty)
                 .changed()
@@ -222,7 +222,9 @@ pub fn view_editor(
     last_text_change: &mut Instant,
     pending_text: &mut Option<String>,
 ) {
-    let content_before = model.content.clone();
+    let content_before = model.content().to_string();
+    // Извлекаем String из модели для TextEdit (который требует &mut String)
+    let mut edit_content = model.content().to_string();
 
     egui::CentralPanel::default().show(ctx, |ui| {
         egui::ScrollArea::vertical()
@@ -230,14 +232,14 @@ pub fn view_editor(
             .show(ui, |ui| {
                 ui.add_sized(
                     ui.available_size(),
-                    egui::TextEdit::multiline(&mut model.content)
+                    egui::TextEdit::multiline(&mut edit_content)
                         .code_editor()
                         .desired_width(f32::INFINITY)
                         .desired_rows(50)
                         .font(TextStyle::Monospace)
                         .layouter(&mut |ui: &egui::Ui, text: &str, _wrap_width: f32| {
                             let mut job = LayoutJob::default();
-                            let error_lines = &model.error_lines;
+                            let error_lines = &model.error_lines();
                             let mut char_offset = 0;
 
                             for (i, _line) in text.split('\n').enumerate() {
@@ -288,9 +290,10 @@ pub fn view_editor(
     });
 
     // Если текст изменился — помечаем как modified и отправляем TextChanged с coalesce
-    if model.content != content_before {
-        model.modified = true;
-        *pending_text = Some(model.content.clone());
+    if edit_content != content_before {
+        model.set_content(edit_content);
+        model.set_modified(true);
+        *pending_text = Some(model.content().to_string());
         *last_text_change = Instant::now();
     }
 }
@@ -298,7 +301,7 @@ pub fn view_editor(
 /// Отрисовывает диалог подтверждения выхода/закрытия.
 pub fn view_exit_dialog(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
     let mut intents = Vec::new();
-    if !model.show_exit_dialog {
+    if !model.show_exit_dialog() {
         return intents;
     }
 
@@ -326,7 +329,7 @@ pub fn view_exit_dialog(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
         });
 
     // Если закрыли крестиком — считаем отменой
-    if !is_open && model.show_exit_dialog {
+    if !is_open && model.show_exit_dialog() {
         intents.push(Intent::CancelAction);
     }
 
@@ -336,7 +339,7 @@ pub fn view_exit_dialog(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
 /// Отрисовывает окно горячих клавиш.
 pub fn view_shortcuts(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
     let mut intents = Vec::new();
-    if !model.shortcuts_open {
+    if !model.shortcuts_open() {
         return intents;
     }
 
