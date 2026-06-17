@@ -1,21 +1,37 @@
 //! Инфраструктурный слой: лексер — преобразует текст в токены
 //!
-//! Лексер зависит от доменных типов Token, но не содержит бизнес-логики.
+//! Реализует доменный контракт Lexer.
 
-use crate::domain::Token;
+use crate::domain::{Lexer, Token};
 
-/// Лексер для разбора текста программы G-кода в последовательность токенов
-pub struct Lexer {
+/// Стандартный лексер для G-кода.
+/// Реализует доменный трейт Lexer.
+pub struct DefaultLexer;
+
+impl DefaultLexer {
+    pub fn new() -> Self {
+        DefaultLexer
+    }
+}
+
+impl Lexer for DefaultLexer {
+    fn tokenize(&self, input: &str) -> Vec<Token> {
+        tokenize(input)
+    }
+}
+
+/// Внутренняя структура лексера для посимвольного разбора
+struct LexerInner {
     input: String,
     position: usize,
     read_position: usize,
     ch: char,
 }
 
-impl Lexer {
+impl LexerInner {
     /// Создаёт новый лексер для переданного текста
     pub fn new(input: String) -> Self {
-        let mut lexer = Lexer {
+        let mut lexer = LexerInner {
             input,
             position: 0,
             read_position: 0,
@@ -165,7 +181,11 @@ impl Lexer {
         // (до того как word будет перемещён в full_word)
         let is_flow_control = {
             let upper = word.to_uppercase();
-            upper == "WHILE" || upper == "IF" || upper == "ELSE" || upper == "REPEAT" || upper == "UNTIL"
+            upper == "WHILE"
+                || upper == "IF"
+                || upper == "ELSE"
+                || upper == "REPEAT"
+                || upper == "UNTIL"
         };
 
         let mut full_word = word;
@@ -287,7 +307,7 @@ impl Lexer {
         if self.ch == '=' {
             full.push('=');
             self.read_char(); // пропускаем =
-            // Пропускаем пробелы после '=' (бывает "R100 = 5")
+                              // Пропускаем пробелы после '=' (бывает "R100 = 5")
             while self.ch.is_whitespace() && self.ch != '\n' {
                 self.read_char();
             }
@@ -349,7 +369,7 @@ impl Lexer {
 
 /// Вспомогательная функция: собирает все токены из строки в вектор
 pub fn tokenize(input: &str) -> Vec<Token> {
-    let mut lexer = Lexer::new(input.to_string());
+    let mut lexer = LexerInner::new(input.to_string());
     let mut tokens = Vec::new();
     loop {
         let token = lexer.next_token();
