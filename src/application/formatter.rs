@@ -280,6 +280,7 @@ impl Formatter {
             }
             Statement::NCode(code) => format!("N{:04}", code),
             Statement::Speed(s) => s.clone(),
+            Statement::RParameter(r) => r.clone(),
             Statement::Word(word) => word.clone(),
             Statement::Misc(m) => {
                 let prefix = if self.config.uppercase_codes {

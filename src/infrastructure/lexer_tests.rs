@@ -35,7 +35,10 @@ fn test_negative_numbers() {
 
     assert_eq!(tokens[0], Token::GCode(0));
     assert_eq!(tokens[1], Token::Axis("X".to_string(), Some(-10.0), None));
-    assert_eq!(tokens[2], Token::Axis("Y".to_string(), Some(-20.5), Some(1)));
+    assert_eq!(
+        tokens[2],
+        Token::Axis("Y".to_string(), Some(-20.5), Some(1))
+    );
 }
 
 #[test]
@@ -108,9 +111,15 @@ fn test_axis_without_gcode() {
     // Строки начинающиеся с оси (продолжение предыдущего G-кода)
     let tokens = tokenize(" Z71.304\n Y-58.346");
 
-    assert_eq!(tokens[0], Token::Axis("Z".to_string(), Some(71.304), Some(3)));
+    assert_eq!(
+        tokens[0],
+        Token::Axis("Z".to_string(), Some(71.304), Some(3))
+    );
     assert_eq!(tokens[1], Token::NewLine);
-    assert_eq!(tokens[2], Token::Axis("Y".to_string(), Some(-58.346), Some(3)));
+    assert_eq!(
+        tokens[2],
+        Token::Axis("Y".to_string(), Some(-58.346), Some(3))
+    );
 }
 
 // -----------------------------------------------------------------------
@@ -180,29 +189,46 @@ fn test_whitespace_with_newlines() {
 fn test_system_variable() {
     let tokens = tokenize("R50=$TC_MPP6[9998,1]");
     assert_eq!(tokens.len(), 1);
-    assert_eq!(tokens[0], Token::Word("R50=$TC_MPP6[9998,1]".to_string()));
+    assert_eq!(
+        tokens[0],
+        Token::RParameter("R50=$TC_MPP6[9998,1]".to_string())
+    );
 }
 
 #[test]
 fn test_r_parameter_assign() {
     let tokens = tokenize("R101=R101+1");
     assert_eq!(tokens.len(), 1);
-    assert_eq!(tokens[0], Token::Word("R101=R101+1".to_string()));
+    assert_eq!(tokens[0], Token::RParameter("R101=R101+1".to_string()));
 }
 
 #[test]
 fn test_r_parameter_assign_with_spaces() {
     let tokens = tokenize("R100 = 5");
     assert_eq!(tokens.len(), 1);
-    assert_eq!(tokens[0], Token::Word("R100=5".to_string()));
+    assert_eq!(tokens[0], Token::RParameter("R100=5".to_string()));
 }
 
 #[test]
 fn test_r_parameter_simple() {
     let tokens = tokenize("G0 R50 X100");
     assert_eq!(tokens[0], Token::GCode(0));
-    assert_eq!(tokens[1], Token::Word("R50".to_string()));
+    assert_eq!(tokens[1], Token::RParameter("R50".to_string()));
     assert_eq!(tokens[2], Token::Axis("X".to_string(), Some(100.0), None));
+}
+
+#[test]
+fn test_rcheck_is_word_not_rparameter() {
+    // RCHECK — команда, не R-параметр
+    let tokens = tokenize("RCHECK");
+    assert_eq!(tokens[0], Token::Word("RCHECK".to_string()));
+}
+
+#[test]
+fn test_rmac_is_word_not_rparameter() {
+    // RMAC — команда, не R-параметр
+    let tokens = tokenize("RMAC");
+    assert_eq!(tokens[0], Token::Word("RMAC".to_string()));
 }
 
 #[test]
@@ -307,7 +333,10 @@ fn test_until_with_spaces() {
 fn test_if_with_parens() {
     let tokens = tokenize("IF (R101==0) AND (R102>5)");
     assert_eq!(tokens.len(), 1);
-    assert_eq!(tokens[0], Token::Word("IF (R101==0) AND (R102>5)".to_string()));
+    assert_eq!(
+        tokens[0],
+        Token::Word("IF (R101==0) AND (R102>5)".to_string())
+    );
 }
 
 #[test]

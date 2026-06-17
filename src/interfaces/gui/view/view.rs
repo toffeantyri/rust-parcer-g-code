@@ -275,6 +275,7 @@ fn build_highlighted_job(text: &str, error_lines: &[usize]) -> egui::text::Layou
             // Синий — чуть темнее
             Token::MCode(_) => Color32::from_rgb(50, 120, 200),
             Token::Speed(_) => Color32::from_rgb(135, 206, 250),
+            Token::RParameter(_) => Color32::from_rgb(30, 80, 160),
             // Жёлтый — светлее
             Token::Axis(_, _, _) => Color32::from_rgb(220, 210, 80),
             Token::AxisExpr(_, _) => Color32::from_rgb(180, 150, 30),
@@ -290,6 +291,12 @@ fn build_highlighted_job(text: &str, error_lines: &[usize]) -> egui::text::Layou
                     || upper == "UNTIL"
                 {
                     Color32::from_rgb(200, 100, 100)
+                // R-параметры — тёмно-синий (только R + цифры)
+                } else if (w.starts_with('R') || w.starts_with('r'))
+                    && w.len() > 1
+                    && w[1..].chars().next().map_or(false, |c| c.is_ascii_digit())
+                {
+                    Color32::from_rgb(30, 80, 160)
                 } else {
                     Color32::from_rgb(200, 80, 80)
                 }

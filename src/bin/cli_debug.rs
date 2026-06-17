@@ -103,6 +103,7 @@ fn main() {
             },
             Token::AxisExpr(letter, expr) => line.push_str(&format!("{letter}={expr} ")),
             Token::Speed(val) => line.push_str(&format!("{val} ")),
+            Token::RParameter(val) => line.push_str(&format!("{val} ")),
             Token::Number(n) => line.push_str(&format!("{n} ")),
             Token::Comment(s) => line.push_str(&format!(";{s}")),
             Token::Unknown(ch) => line.push_str(&format!("?{ch}? ")),
@@ -134,6 +135,7 @@ fn format_token(tok: &Token) -> (String, String) {
         Token::NewLine => ("NewLine".to_string(), "\\n".to_string()),
         Token::Eof => ("Eof".to_string(), "".to_string()),
         Token::Speed(val) => ("Speed".to_string(), val.clone()),
+        Token::RParameter(val) => ("RParameter".to_string(), val.clone()),
         Token::Unknown(ch) => ("Unknown".to_string(), format!("'{ch}'")),
     }
 }

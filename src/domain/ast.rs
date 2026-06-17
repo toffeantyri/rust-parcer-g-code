@@ -27,6 +27,8 @@ pub enum Statement {
     IfBlock(IfStatement),
     /// Скорость шпинделя (S1000, S1=1000, SS1=500)
     Speed(String),
+    /// R-параметр (R50, R101=R101+1)
+    RParameter(String),
 }
 
 /// Команда движения (G0, G1, G2...)
@@ -103,6 +105,7 @@ impl fmt::Display for Statement {
             Statement::WhileBlock(w) => write!(f, "WHILE {}", w.condition),
             Statement::IfBlock(i) => write!(f, "IF {}", i.condition),
             Statement::Speed(s) => write!(f, "{}", s),
+            Statement::RParameter(r) => write!(f, "{}", r),
         }
     }
 }

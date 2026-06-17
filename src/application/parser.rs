@@ -58,6 +58,7 @@ impl Parser {
             Token::NewLine => Ok(Some(Statement::NewLine)),
             Token::NCode(code) => Ok(Some(Statement::NCode(*code))),
             Token::Speed(val) => Ok(Some(Statement::Speed(val.clone()))),
+            Token::RParameter(val) => Ok(Some(Statement::RParameter(val.clone()))),
             Token::Word(word) => {
                 let w = word.clone();
                 self.parse_word(&w)
@@ -506,6 +507,7 @@ impl Parser {
             }
             Token::AxisExpr(axis, expr) => format!("{}={}", axis, expr),
             Token::Speed(val) => val.clone(),
+            Token::RParameter(val) => val.clone(),
             Token::Word(word) => word.clone(),
             Token::NCode(code) => format!("N{:04}", code),
             Token::Number(value) => value.to_string(),

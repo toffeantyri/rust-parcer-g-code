@@ -17,6 +17,8 @@ pub enum Token {
     AxisExpr(String, String),
     /// Скорость вращения шпинделя (S1000, S1=1000, S2=500)
     Speed(String),
+    /// R-параметр (R50, R101=R101+1)
+    RParameter(String),
     Number(f64),
     /// Комментарий после `;`
     Comment(String),

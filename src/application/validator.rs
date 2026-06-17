@@ -46,6 +46,15 @@ pub fn validate(program: &[Statement]) -> Vec<ValidationMessage> {
                     ));
                 }
             }
+            Statement::RParameter(r) => {
+                // RParameter должен быть непустым
+                if r.len() <= 1 || r == "R" || r == "R=" {
+                    messages.push(ValidationMessage::warning(
+                        line,
+                        "R-параметр без значения".to_string(),
+                    ));
+                }
+            }
             Statement::Word(word) => {
                 // Проверяем оси с `=` и пустым значением, например `X=`
                 // Word вида "X=" (одна буква + =) — ошибка

@@ -352,7 +352,7 @@ impl LexerInner {
                 self.read_char();
             }
         }
-        Token::Word(full)
+        Token::RParameter(full)
     }
 
     /// Читает скорость шпинделя (S, S1, S2, SS1, SS2...).
