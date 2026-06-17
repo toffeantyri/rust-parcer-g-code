@@ -1,7 +1,7 @@
 //! Update — редьюсер: применяет намерения к модели
 
-use super::intent::Intent;
-use super::model::Model;
+use crate::interfaces::gui::intent::Intent;
+use crate::interfaces::gui::model::{Model, PendingAction};
 use crate::shared::i18n;
 
 impl Model {
@@ -12,7 +12,7 @@ impl Model {
             Intent::CloseFile => {
                 if self.modified && !self.file_path.is_empty() {
                     self.show_exit_dialog = true;
-                    self.pending_action = Some(super::model::PendingAction::CloseFile);
+                    self.pending_action = Some(PendingAction::CloseFile);
                 } else {
                     self.content.clear();
                     self.file_path.clear();
@@ -23,7 +23,7 @@ impl Model {
             Intent::Exit => {
                 if self.modified && !self.file_path.is_empty() {
                     self.show_exit_dialog = true;
-                    self.pending_action = Some(super::model::PendingAction::Exit);
+                    self.pending_action = Some(PendingAction::Exit);
                 } else {
                     std::process::exit(0);
                 }
@@ -96,7 +96,9 @@ impl Model {
     pub fn load_settings(&mut self) {
         let path = settings_path();
         if let Ok(json) = std::fs::read_to_string(&path) {
-            if let Ok(settings) = serde_json::from_str::<super::model::FormatSettings>(&json) {
+            if let Ok(settings) =
+                serde_json::from_str::<crate::interfaces::gui::model::FormatSettings>(&json)
+            {
                 self.format_settings = settings;
             }
         }

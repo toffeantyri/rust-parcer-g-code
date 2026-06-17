@@ -1,5 +1,5 @@
-use super::*;
-use crate::interfaces::gui::model::PendingAction;
+use crate::interfaces::gui::intent::Intent;
+use crate::interfaces::gui::model::{Model, PendingAction};
 
 fn make_model() -> Model {
     Model {
@@ -134,9 +134,9 @@ fn test_set_language_en() {
     assert_eq!(m.format_settings.language, "ru");
     m.apply(&Intent::SetLanguage("en".to_string()));
     assert_eq!(m.format_settings.language, "en");
-    assert_eq!(i18n::current_lang(), "en");
-    // Сброс, чтобы не влиять на другие тесты
-    i18n::set_lang("ru");
+    assert_eq!(crate::shared::i18n::current_lang(), "en");
+    // Сброс
+    crate::shared::i18n::set_lang("ru");
 }
 
 #[test]
@@ -145,7 +145,7 @@ fn test_set_language_ru() {
     m.apply(&Intent::SetLanguage("en".to_string()));
     m.apply(&Intent::SetLanguage("ru".to_string()));
     assert_eq!(m.format_settings.language, "ru");
-    assert_eq!(i18n::current_lang(), "ru");
+    assert_eq!(crate::shared::i18n::current_lang(), "ru");
 }
 
 // -----------------------------------------------------------------------

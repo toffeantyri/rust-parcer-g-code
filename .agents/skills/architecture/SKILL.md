@@ -21,7 +21,7 @@ disable-model-invocation: false
 src/
 ├── domain/          # сущности, трейты контрактов
 ├── application/     # use cases (интеракторы)
-├── infrastructure/  # реализации трейтов (лексер, парсер, IO)
+├── infrastructure/  # реализации трейтов (лексер, IO)
 ├── interfaces/      # GUI (egui MVI) + CLI (clap)
 │   └── gui/
 │       ├── app/     # eframe::App, соединяет слои
@@ -39,7 +39,7 @@ src/
 2. Intent — enum действий (ButtonClicked, TextChanged и т.д.)
 3. Update — чистая функция, без IO/CPU. Только мутация model.
 4. View — отрисовывает UI на основе &Model, возвращает Vec<Intent>
-5. App — в update(): collect intents → apply update() → отправка в data layer → try_recv()
+5. App — в update(): try_recv() → collect intents → handle_intent(apply + отправка в data layer)
 6. TextEdit — единственное исключение из MVI (мутирует напрямую)
 
 ## MVVM (для сложных компонентов)

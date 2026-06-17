@@ -9,8 +9,8 @@ use crate::data_layer::EditorCommand;
 
 use crate::shared::i18n;
 
-use super::intent::Intent;
-use super::model::Model;
+use crate::interfaces::gui::intent::Intent;
+use crate::interfaces::gui::model::Model;
 
 /// Собирает намерения от UI: меню + панель инструментов.
 pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &Model) -> Vec<Intent> {

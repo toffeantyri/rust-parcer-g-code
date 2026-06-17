@@ -11,13 +11,13 @@ use crate::data_layer::{
 };
 use crate::shared::i18n;
 
-use super::intent::Intent;
-use super::model::Model;
-use super::view;
+use crate::interfaces::gui::intent::Intent;
+use crate::interfaces::gui::model::{Model, PendingAction};
+use crate::interfaces::gui::view;
 
 /// Главное приложение G-Code Editor.
 pub struct GCodeApp {
-    model: Model,
+    pub(crate) model: Model,
     cmd_tx: mpsc::Sender<EditorCommand>,
     evt_rx: mpsc::Receiver<EditorEvent>,
     /// Последнее время отправки TextChanged (для coalesce).
@@ -25,9 +25,9 @@ pub struct GCodeApp {
     /// Текст, ожидающий отправки (для coalesce).
     pending_text: Option<String>,
     /// Флаг: ожидание ответа от data layer на диалог.
-    awaiting_picker: bool,
-    awaiting_save_picker: bool,
-    awaiting_dialog: bool,
+    pub(crate) awaiting_picker: bool,
+    pub(crate) awaiting_save_picker: bool,
+    pub(crate) awaiting_dialog: bool,
 }
 
 impl GCodeApp {
@@ -108,16 +108,16 @@ impl GCodeApp {
                     self.model.modified = false;
                     self.model.is_busy = false;
                     match self.model.save_and_exec.take() {
-                        Some(super::model::PendingAction::Exit) => {
+                        Some(PendingAction::Exit) => {
                             std::process::exit(0);
                         }
-                        Some(super::model::PendingAction::CloseFile) => {
+                        Some(PendingAction::CloseFile) => {
                             self.model.content.clear();
                             self.model.file_path.clear();
                             self.model.modified = false;
                             self.model.status = i18n::locale().status.file_closed.to_string();
                         }
-                        Some(super::model::PendingAction::OpenNewFile) => {
+                        Some(PendingAction::OpenNewFile) => {
                             self.model.is_busy = true;
                             let _ = self.cmd_tx.send(EditorCommand::File(FileCommand::OpenFile));
                         }
@@ -190,7 +190,7 @@ impl GCodeApp {
             Intent::OpenFile => {
                 if self.model.modified && !self.model.file_path.is_empty() {
                     self.model.show_exit_dialog = true;
-                    self.model.pending_action = Some(super::model::PendingAction::OpenNewFile);
+                    self.model.pending_action = Some(PendingAction::OpenNewFile);
                 } else {
                     self.model.is_busy = true;
                     let _ = self.cmd_tx.send(EditorCommand::File(FileCommand::OpenFile));
@@ -237,13 +237,13 @@ impl GCodeApp {
                 self.model.modified = false;
                 let action = self.model.pending_action.take();
                 match action {
-                    Some(super::model::PendingAction::Exit) => std::process::exit(0),
-                    Some(super::model::PendingAction::CloseFile) => {
+                    Some(PendingAction::Exit) => std::process::exit(0),
+                    Some(PendingAction::CloseFile) => {
                         self.model.content.clear();
                         self.model.file_path.clear();
                         self.model.status = i18n::locale().status.file_closed.to_string();
                     }
-                    Some(super::model::PendingAction::OpenNewFile) => {
+                    Some(PendingAction::OpenNewFile) => {
                         self.model.is_busy = true;
                         let _ = self.cmd_tx.send(EditorCommand::File(FileCommand::OpenFile));
                     }
@@ -266,7 +266,7 @@ impl eframe::App for GCodeApp {
             if self.model.modified && !self.model.file_path.is_empty() {
                 ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
                 self.model.show_exit_dialog = true;
-                self.model.pending_action = Some(super::model::PendingAction::Exit);
+                self.model.pending_action = Some(PendingAction::Exit);
             }
         }
 

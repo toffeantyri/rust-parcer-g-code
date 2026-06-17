@@ -1,5 +1,11 @@
-use super::*;
+use crate::data_layer::{
+    DialogCommand, DialogEvent, EditorCommand, EditorEvent, FileCommand, FileEvent,
+    PipelineCommand, PipelineEvent,
+};
+use crate::interfaces::gui::app::GCodeApp;
+use crate::interfaces::gui::intent::Intent;
 use crate::interfaces::gui::model::PendingAction;
+use std::sync::mpsc;
 
 fn make_app() -> GCodeApp {
     let (tx, _) = mpsc::channel();
@@ -34,7 +40,7 @@ fn test_handle_formatted_updates_content() {
     assert_eq!(app.model.content, "G0 X10");
     assert_eq!(
         app.model.status,
-        i18n::locale().status.formatted.to_string()
+        crate::shared::i18n::locale().status.formatted.to_string()
     );
     assert!(!app.model.is_busy);
 }
@@ -80,7 +86,7 @@ fn test_handle_validated_no_errors() {
 
     assert_eq!(
         app.model.status,
-        i18n::locale().status.no_errors.to_string()
+        crate::shared::i18n::locale().status.no_errors.to_string()
     );
     assert!(!app.model.is_busy);
 }
@@ -128,7 +134,10 @@ fn test_handle_saved_without_pending_action() {
     assert_eq!(app.model.file_path, "/path/file.nc");
     assert!(!app.model.modified);
     assert!(!app.model.is_busy);
-    assert_eq!(app.model.status, i18n::locale().status.saved.to_string());
+    assert_eq!(
+        app.model.status,
+        crate::shared::i18n::locale().status.saved.to_string()
+    );
 }
 
 #[test]
@@ -145,7 +154,7 @@ fn test_handle_saved_with_close_file_action() {
     assert!(!app.model.modified);
     assert_eq!(
         app.model.status,
-        i18n::locale().status.file_closed.to_string()
+        crate::shared::i18n::locale().status.file_closed.to_string()
     );
 }
 
@@ -202,7 +211,10 @@ fn test_intent_format_empty_editor() {
     app.handle_intent(&Intent::Format);
     assert_eq!(
         app.model.status,
-        i18n::locale().status.empty_editor.to_string()
+        crate::shared::i18n::locale()
+            .status
+            .empty_editor
+            .to_string()
     );
     assert!(!app.model.is_busy);
 }
@@ -214,7 +226,7 @@ fn test_intent_format_with_content_sets_busy() {
     assert!(app.model.is_busy);
     assert_eq!(
         app.model.status,
-        i18n::locale().status.formatting.to_string()
+        crate::shared::i18n::locale().status.formatting.to_string()
     );
 }
 
@@ -225,7 +237,10 @@ fn test_intent_validate_empty_editor() {
     app.handle_intent(&Intent::Validate);
     assert_eq!(
         app.model.status,
-        i18n::locale().status.empty_validate.to_string()
+        crate::shared::i18n::locale()
+            .status
+            .empty_validate
+            .to_string()
     );
 }
 
@@ -298,7 +313,7 @@ fn test_intent_discard_close_file() {
     assert!(app.model.file_path.is_empty());
     assert_eq!(
         app.model.status,
-        i18n::locale().status.file_closed.to_string()
+        crate::shared::i18n::locale().status.file_closed.to_string()
     );
 }
 
