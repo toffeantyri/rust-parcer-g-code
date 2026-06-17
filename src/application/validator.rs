@@ -10,7 +10,7 @@ use crate::domain::Statement;
 use crate::shared::{Severity, ValidationMessage};
 
 /// Буквы осей G-кода (должен совпадать с лексером)
-const AXIS_LETTERS: &str = "XYZABCUVWFSIJK";
+const AXIS_LETTERS: &str = "XYZABCUVWFIJK";
 
 /// Проверяет программу (AST) на синтаксические ошибки.
 /// Возвращает список сообщений валидации с номерами строк.
@@ -35,6 +35,14 @@ pub fn validate(program: &[Statement]) -> Vec<ValidationMessage> {
                     messages.push(ValidationMessage::error(
                         line,
                         format!("Ось '{}' указана без значения", a.axis),
+                    ));
+                }
+            }
+            Statement::Speed(s) => {
+                if s.trim().is_empty() || s == "S" || s == "S=" {
+                    messages.push(ValidationMessage::error(
+                        line,
+                        "Скорость шпинделя (S) указана без значения".to_string(),
                     ));
                 }
             }

@@ -79,6 +79,138 @@ fn test_format_code_with_multiple_errors() {
     assert_eq!(errors.len(), 2);
 }
 
+#[test]
+fn test_format_code_preserves_decimal_places() {
+    // Z10 (целое) — должно остаться Z10 без точки
+    let result = format_code("Z10", 0, true);
+    assert!(result.is_ok());
+    let (formatted, _) = result.unwrap();
+    assert!(
+        formatted.contains("Z10"),
+        "Ожидалось Z10, получено: {}",
+        formatted
+    );
+    assert!(
+        !formatted.contains("."),
+        "Z10 не должно содержать точки: {}",
+        formatted
+    );
+}
+
+#[test]
+fn test_format_code_preserves_three_decimal_places() {
+    // Z10.123 (3 знака) — должно остаться Z10.123
+    let result = format_code("Z10.123", 0, true);
+    assert!(result.is_ok());
+    let (formatted, _) = result.unwrap();
+    assert!(
+        formatted.contains("Z10.123"),
+        "Ожидалось Z10.123, получено: {}",
+        formatted
+    );
+}
+
+#[test]
+fn test_format_code_removes_trailing_zeros_from_integer() {
+    // X10.000 — целое, должно стать X10 без знаков
+    let result = format_code("X10.000", 0, true);
+    assert!(result.is_ok());
+    let (formatted, _) = result.unwrap();
+    assert!(
+        formatted.contains("X10"),
+        "X10.000 ожидалось X10, получено: {}",
+        formatted
+    );
+    assert!(
+        !formatted.contains("."),
+        "X10 не должно содержать точки: {}",
+        formatted
+    );
+}
+
+#[test]
+fn test_format_code_removes_trailing_zeros_from_decimal() {
+    // X10.100 — должно стать X10.1
+    let result = format_code("X10.100", 0, true);
+    assert!(result.is_ok());
+    let (formatted, _) = result.unwrap();
+    assert!(
+        formatted.contains("X10.1"),
+        "X10.100 ожидалось X10.1, получено: {}",
+        formatted
+    );
+}
+
+#[test]
+fn test_format_code_removes_trailing_zeros_negative() {
+    // X-5.500 — должно стать X-5.5
+    let result = format_code("X-5.500", 0, true);
+    assert!(result.is_ok());
+    let (formatted, _) = result.unwrap();
+    assert!(
+        formatted.contains("X-5.5"),
+        "X-5.500 ожидалось X-5.5, получено: {}",
+        formatted
+    );
+}
+
+#[test]
+fn test_format_code_no_trailing_zeros() {
+    // Y20.0 — должно стать Y20
+    let result = format_code("Y20.0", 0, true);
+    assert!(result.is_ok());
+    let (formatted, _) = result.unwrap();
+    assert!(
+        formatted.contains("Y20"),
+        "Y20.0 ожидалось Y20, получено: {}",
+        formatted
+    );
+    assert!(
+        !formatted.contains("."),
+        "Y20 не должно содержать точки: {}",
+        formatted
+    );
+}
+
+#[test]
+fn test_format_code_speed_simple() {
+    let result = format_code("S1000", 0, true);
+    assert!(result.is_ok());
+    let (formatted, _) = result.unwrap();
+    assert!(
+        formatted.contains("S1000"),
+        "S1000 ожидалось, получено: {}",
+        formatted
+    );
+}
+
+#[test]
+fn test_format_code_speed_with_equals() {
+    let result = format_code("S1=1000", 0, true);
+    assert!(result.is_ok());
+    let (formatted, _) = result.unwrap();
+    assert!(
+        formatted.contains("S1=1000"),
+        "S1=1000 ожидалось, получено: {}",
+        formatted
+    );
+}
+
+#[test]
+fn test_format_code_speed_ss() {
+    let result = format_code("SS1=500", 0, true);
+    // Токен SS1=500 разбирается как Word("SS"), затем 1, = и 500 — это не Speed,
+    // но ошибки быть не должно: "SS" — обычное слово.
+    assert!(result.is_ok());
+    let (formatted, errors) = result.unwrap();
+    // Ошибок валидации быть не должно (это не Speed, а Word)
+    assert!(
+        errors.is_empty(),
+        "Неожиданные ошибки валидации: {:?}",
+        errors
+    );
+}
+
 // -----------------------------------------------------------------------
 // validate_code
 // -----------------------------------------------------------------------

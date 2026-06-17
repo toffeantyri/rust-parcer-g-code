@@ -274,6 +274,7 @@ fn build_highlighted_job(text: &str, error_lines: &[usize]) -> egui::text::Layou
             Token::GCode(_) => Color32::from_rgb(120, 210, 100),
             // Синий — чуть темнее
             Token::MCode(_) => Color32::from_rgb(50, 120, 200),
+            Token::Speed(_) => Color32::from_rgb(135, 206, 250),
             // Жёлтый — светлее
             Token::Axis(_, _, _) => Color32::from_rgb(220, 210, 80),
             Token::AxisExpr(_, _) => Color32::from_rgb(180, 150, 30),

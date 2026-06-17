@@ -28,6 +28,23 @@ pub struct Formatter {
     config: FormatConfig,
 }
 
+/// Отбрасывает незначащие нули после десятичной точки.
+/// Примеры: "X10.000" → "X10", "X10.100" → "X10.1", "X-5.500" → "X-5.5"
+fn trim_trailing_zeros(input: String) -> String {
+    if !input.contains('.') {
+        return input;
+    }
+    let dot_pos = input.find('.').unwrap();
+    let prefix = &input[..dot_pos];
+    let fractional = &input[dot_pos + 1..];
+    let trimmed = fractional.trim_end_matches('0');
+    if trimmed.is_empty() {
+        prefix.to_string()
+    } else {
+        format!("{}.{}", prefix, trimmed)
+    }
+}
+
 impl Formatter {
     pub fn new(config: FormatConfig) -> Self {
         Formatter { config }
@@ -147,11 +164,7 @@ impl Formatter {
         result
     }
 
-    fn format_while(
-        &self,
-        w: &WhileStatement,
-        indent_level: usize,
-    ) -> String {
+    fn format_while(&self, w: &WhileStatement, indent_level: usize) -> String {
         let indent = self.make_indent(indent_level);
         let body_indent = self.make_indent(indent_level + 1);
         let mut out = String::new();
@@ -187,11 +200,7 @@ impl Formatter {
         out
     }
 
-    fn format_if(
-        &self,
-        i: &IfStatement,
-        indent_level: usize,
-    ) -> String {
+    fn format_if(&self, i: &IfStatement, indent_level: usize) -> String {
         let indent = self.make_indent(indent_level);
         let body_indent = self.make_indent(indent_level + 1);
         let mut out = String::new();
@@ -262,19 +271,31 @@ impl Formatter {
     fn format_statement(&self, stmt: &Statement) -> String {
         match stmt {
             Statement::Motion(m) => {
-                let prefix = if self.config.uppercase_codes { "G" } else { "g" };
+                let prefix = if self.config.uppercase_codes {
+                    "G"
+                } else {
+                    "g"
+                };
                 format!("{}{}", prefix, m.code)
             }
             Statement::NCode(code) => format!("N{:04}", code),
+            Statement::Speed(s) => s.clone(),
             Statement::Word(word) => word.clone(),
             Statement::Misc(m) => {
-                let prefix = if self.config.uppercase_codes { "M" } else { "m" };
+                let prefix = if self.config.uppercase_codes {
+                    "M"
+                } else {
+                    "m"
+                };
                 format!("{}{}", prefix, m.code)
             }
             Statement::Axis(a) => {
                 if let Some(v) = a.value {
                     if let Some(prec) = a.decimal_places {
-                        format!("{}{:.prec$}", a.axis, v, prec = prec)
+                        // Форматируем с заданным количеством знаков
+                        let formatted = format!("{}{:.prec$}", a.axis, v, prec = prec);
+                        // Отбрасываем незначащие нули и точку, если число целое
+                        trim_trailing_zeros(formatted)
                     } else {
                         // Целое число — выводим без десятичной точки
                         format!("{}{}", a.axis, v)

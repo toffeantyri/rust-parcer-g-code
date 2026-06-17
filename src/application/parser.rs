@@ -51,14 +51,13 @@ impl Parser {
                 value: *value,
                 decimal_places: *decimals,
             }))),
-            Token::AxisExpr(axis, expr) => {
-                Ok(Some(Statement::Word(format!("{}={}", axis, expr))))
-            }
+            Token::AxisExpr(axis, expr) => Ok(Some(Statement::Word(format!("{}={}", axis, expr)))),
             Token::Comment(text) => Ok(Some(Statement::Comment(CommentStatement {
                 text: text.clone(),
             }))),
             Token::NewLine => Ok(Some(Statement::NewLine)),
             Token::NCode(code) => Ok(Some(Statement::NCode(*code))),
+            Token::Speed(val) => Ok(Some(Statement::Speed(val.clone()))),
             Token::Word(word) => {
                 let w = word.clone();
                 self.parse_word(&w)
@@ -130,21 +129,18 @@ impl Parser {
                     code: *code,
                     rapid: *code == 0,
                 })),
-                Token::MCode(code) => {
-                    body.push(Statement::Misc(MiscStatement { code: *code }))
-                }
+                Token::MCode(code) => body.push(Statement::Misc(MiscStatement { code: *code })),
                 Token::Axis(axis, value, decimals) => body.push(Statement::Axis(AxisStatement {
                     axis: axis.clone(),
                     value: *value,
                     decimal_places: *decimals,
                 })),
-                Token::AxisExpr(axis, expr) => body.push(Statement::Word(format!(
-                    "{}={}",
-                    axis, expr
-                ))),
-                Token::Comment(text) => body.push(Statement::Comment(CommentStatement {
-                    text: text.clone(),
-                })),
+                Token::AxisExpr(axis, expr) => {
+                    body.push(Statement::Word(format!("{}={}", axis, expr)))
+                }
+                Token::Comment(text) => {
+                    body.push(Statement::Comment(CommentStatement { text: text.clone() }))
+                }
                 Token::Eof => {
                     return Err(ParseError {
                         message: "WHILE без ENDWHILE".into(),
@@ -186,10 +182,7 @@ impl Parser {
                     if up == "ENDWHILE" {
                         depth -= 1;
                         if depth == 0 {
-                            return Ok(Statement::WhileBlock(WhileStatement {
-                                condition,
-                                body,
-                            }));
+                            return Ok(Statement::WhileBlock(WhileStatement { condition, body }));
                         }
                         body.push(Statement::Word(w.clone()));
                     } else if up.starts_with("WHILE") {
@@ -211,21 +204,18 @@ impl Parser {
                     code: *code,
                     rapid: *code == 0,
                 })),
-                Token::MCode(code) => {
-                    body.push(Statement::Misc(MiscStatement { code: *code }))
-                }
+                Token::MCode(code) => body.push(Statement::Misc(MiscStatement { code: *code })),
                 Token::Axis(axis, value, decimals) => body.push(Statement::Axis(AxisStatement {
                     axis: axis.clone(),
                     value: *value,
                     decimal_places: *decimals,
                 })),
-                Token::AxisExpr(axis, expr) => body.push(Statement::Word(format!(
-                    "{}={}",
-                    axis, expr
-                ))),
-                Token::Comment(text) => body.push(Statement::Comment(CommentStatement {
-                    text: text.clone(),
-                })),
+                Token::AxisExpr(axis, expr) => {
+                    body.push(Statement::Word(format!("{}={}", axis, expr)))
+                }
+                Token::Comment(text) => {
+                    body.push(Statement::Comment(CommentStatement { text: text.clone() }))
+                }
                 Token::Eof => {
                     return Err(ParseError {
                         message: "WHILE без ENDWHILE".into(),
@@ -273,12 +263,22 @@ impl Parser {
                                 else_body,
                             })));
                         }
-                        push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
+                        push_to(
+                            &mut then_body,
+                            &mut else_body,
+                            in_else,
+                            Statement::Word(w.clone()),
+                        );
                     } else if up == "ELSE" {
                         if depth == 1 {
                             in_else = true;
                         } else {
-                            push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
+                            push_to(
+                                &mut then_body,
+                                &mut else_body,
+                                in_else,
+                                Statement::Word(w.clone()),
+                            );
                         }
                     } else if up.starts_with("IF") {
                         let inner = self.parse_if_block_inline(w)?;
@@ -287,11 +287,23 @@ impl Parser {
                         let inner = self.parse_while_block_inline(w)?;
                         push_to(&mut then_body, &mut else_body, in_else, inner);
                     } else {
-                        push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
+                        push_to(
+                            &mut then_body,
+                            &mut else_body,
+                            in_else,
+                            Statement::Word(w.clone()),
+                        );
                     }
                 }
-                Token::NewLine => push_to(&mut then_body, &mut else_body, in_else, Statement::NewLine),
-                Token::NCode(code) => push_to(&mut then_body, &mut else_body, in_else, Statement::NCode(*code)),
+                Token::NewLine => {
+                    push_to(&mut then_body, &mut else_body, in_else, Statement::NewLine)
+                }
+                Token::NCode(code) => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::NCode(*code),
+                ),
                 Token::GCode(code) => push_to(
                     &mut then_body,
                     &mut else_body,
@@ -327,9 +339,7 @@ impl Parser {
                     &mut then_body,
                     &mut else_body,
                     in_else,
-                    Statement::Comment(CommentStatement {
-                        text: text.clone(),
-                    }),
+                    Statement::Comment(CommentStatement { text: text.clone() }),
                 ),
                 Token::Eof => {
                     return Err(ParseError {
@@ -378,12 +388,22 @@ impl Parser {
                                 else_body,
                             }));
                         }
-                        push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
+                        push_to(
+                            &mut then_body,
+                            &mut else_body,
+                            in_else,
+                            Statement::Word(w.clone()),
+                        );
                     } else if up == "ELSE" {
                         if depth == 1 {
                             in_else = true;
                         } else {
-                            push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
+                            push_to(
+                                &mut then_body,
+                                &mut else_body,
+                                in_else,
+                                Statement::Word(w.clone()),
+                            );
                         }
                     } else if up.starts_with("IF") {
                         let inner = self.parse_if_block_inline(w)?;
@@ -392,11 +412,23 @@ impl Parser {
                         let inner = self.parse_while_block_inline(w)?;
                         push_to(&mut then_body, &mut else_body, in_else, inner);
                     } else {
-                        push_to(&mut then_body, &mut else_body, in_else, Statement::Word(w.clone()));
+                        push_to(
+                            &mut then_body,
+                            &mut else_body,
+                            in_else,
+                            Statement::Word(w.clone()),
+                        );
                     }
                 }
-                Token::NewLine => push_to(&mut then_body, &mut else_body, in_else, Statement::NewLine),
-                Token::NCode(code) => push_to(&mut then_body, &mut else_body, in_else, Statement::NCode(*code)),
+                Token::NewLine => {
+                    push_to(&mut then_body, &mut else_body, in_else, Statement::NewLine)
+                }
+                Token::NCode(code) => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::NCode(*code),
+                ),
                 Token::GCode(code) => push_to(
                     &mut then_body,
                     &mut else_body,
@@ -432,9 +464,7 @@ impl Parser {
                     &mut then_body,
                     &mut else_body,
                     in_else,
-                    Statement::Comment(CommentStatement {
-                        text: text.clone(),
-                    }),
+                    Statement::Comment(CommentStatement { text: text.clone() }),
                 ),
                 Token::Eof => {
                     return Err(ParseError {
@@ -475,6 +505,7 @@ impl Parser {
                 }
             }
             Token::AxisExpr(axis, expr) => format!("{}={}", axis, expr),
+            Token::Speed(val) => val.clone(),
             Token::Word(word) => word.clone(),
             Token::NCode(code) => format!("N{:04}", code),
             Token::Number(value) => value.to_string(),

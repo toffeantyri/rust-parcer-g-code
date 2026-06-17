@@ -5,8 +5,8 @@
 use std::env;
 use std::fs;
 
-use code_parser::infrastructure::lexer::tokenize;
 use code_parser::domain::Token;
+use code_parser::infrastructure::lexer::tokenize;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -16,11 +16,10 @@ fn main() {
         "text_params.txt".to_string()
     };
 
-    let input = fs::read_to_string(&path)
-        .unwrap_or_else(|e| {
-            eprintln!("Ошибка чтения файла '{}': {}", path, e);
-            std::process::exit(1);
-        });
+    let input = fs::read_to_string(&path).unwrap_or_else(|e| {
+        eprintln!("Ошибка чтения файла '{}': {}", path, e);
+        std::process::exit(1);
+    });
 
     let lines: Vec<&str> = input.lines().collect();
 
@@ -52,7 +51,12 @@ fn main() {
 
     for (i, tok) in tokens.iter().enumerate() {
         let (type_name, value) = format_token(tok);
-        println!("║ {:<4} │ {:<20} │ {:<26} ║", i, truncate(&type_name, 20), truncate(&value, 26));
+        println!(
+            "║ {:<4} │ {:<20} │ {:<26} ║",
+            i,
+            truncate(&type_name, 20),
+            truncate(&value, 26)
+        );
     }
 
     println!("╚══════╧══════════════════════╧════════════════════════════╝");
@@ -85,19 +89,20 @@ fn main() {
             Token::MCode(n) => line.push_str(&format!("M{n:02} ")),
             Token::NCode(n) => line.push_str(&format!("N{n:04} ")),
             Token::Word(s) => {
-                if s.chars().all(|c| c.is_ascii_uppercase() || c.is_ascii_digit()) {
+                if s.chars()
+                    .all(|c| c.is_ascii_uppercase() || c.is_ascii_digit())
+                {
                     line.push_str(&format!("{s} "));
                 } else {
                     line.push_str(&format!("[{s}] "));
                 }
             }
-            Token::Axis(letter, val, _) => {
-                match val {
-                    Some(v) => line.push_str(&format!("{letter}{v} ")),
-                    None => line.push_str(&format!("{letter}? ")),
-                }
-            }
+            Token::Axis(letter, val, _) => match val {
+                Some(v) => line.push_str(&format!("{letter}{v} ")),
+                None => line.push_str(&format!("{letter}? ")),
+            },
             Token::AxisExpr(letter, expr) => line.push_str(&format!("{letter}={expr} ")),
+            Token::Speed(val) => line.push_str(&format!("{val} ")),
             Token::Number(n) => line.push_str(&format!("{n} ")),
             Token::Comment(s) => line.push_str(&format!(";{s}")),
             Token::Unknown(ch) => line.push_str(&format!("?{ch}? ")),
@@ -117,22 +122,21 @@ fn format_token(tok: &Token) -> (String, String) {
         Token::NCode(n) => ("NCode".to_string(), format!("N{n:04}")),
         Token::Word(s) => ("Word".to_string(), s.clone()),
         Token::Axis(letter, val, dec) => {
-            let v = val.map(|v| format!("{v}")).unwrap_or_else(|| "None".to_string());
+            let v = val
+                .map(|v| format!("{v}"))
+                .unwrap_or_else(|| "None".to_string());
             let dec_str = dec.map(|d| format!(" [{}]", d)).unwrap_or_default();
             ("Axis".to_string(), format!("{letter} = {v}{dec_str}"))
         }
-        Token::AxisExpr(letter, expr) => {
-            ("AxisExpr".to_string(), format!("{letter}={expr}"))
-        }
+        Token::AxisExpr(letter, expr) => ("AxisExpr".to_string(), format!("{letter}={expr}")),
         Token::Number(n) => ("Number".to_string(), format!("{n}")),
         Token::Comment(s) => ("Comment".to_string(), s.clone()),
         Token::NewLine => ("NewLine".to_string(), "\\n".to_string()),
         Token::Eof => ("Eof".to_string(), "".to_string()),
+        Token::Speed(val) => ("Speed".to_string(), val.clone()),
         Token::Unknown(ch) => ("Unknown".to_string(), format!("'{ch}'")),
     }
 }
-
-
 
 fn truncate(s: &str, max: usize) -> String {
     if s.chars().count() > max {

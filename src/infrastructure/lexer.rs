@@ -158,7 +158,7 @@ impl LexerInner {
                 }
                 _ => {
                     // Проверяем, является ли буква осью
-                    if "XYZABCUVWFSIJK".contains(letter.as_str()) {
+                    if "XYZABCUVWFIJK".contains(letter.as_str()) {
                         // Если после буквы идёт `=`, читаем выражение
                         if self.ch == '=' {
                             return self.read_axis_expr(letter);
@@ -171,6 +171,10 @@ impl LexerInner {
                         // Ось без числа — оставляем None (будет ошибкой валидации)
                         return Token::Axis(letter, None, None);
                     }
+                    // Проверяем скорость шпинделя (S, S1, S2, SS1, SS2...)
+                    if letter.as_str() == "S" && (self.ch.is_ascii_digit() || self.ch == '=') {
+                        return self.read_speed();
+                    }
                     // Проверяем R-параметр перед тем как вернуть как Word
                     if letter.as_str() == "R" && (self.ch.is_ascii_digit() || self.ch == '=') {
                         return self.read_r_parameter(letter);
@@ -182,6 +186,25 @@ impl LexerInner {
         }
 
         // Многосимвольное слово — захватываем скобочные аргументы как часть слова
+        // Пропускаем пробелы перед скобкой (бывает "MODECHECK (2)")
+        // Но сначала проверяем, не является ли слово скоростью шпинделя (SS1, SS2, SS3...)
+        if word.starts_with('S') || word.starts_with('s') {
+            let rest = &word[1..];
+            if rest.starts_with('S')
+                || rest.starts_with('s')
+                || rest.chars().all(|c| c.is_ascii_digit())
+            {
+                // Это скорость шпинделя — читаем остаток как часть Speed
+                let mut full = word;
+                // После SS или S+цифры может быть = и значение
+                while self.ch != '\0' && !self.ch.is_whitespace() && self.ch != ';' {
+                    full.push(self.ch);
+                    self.read_char();
+                }
+                return Token::Speed(full);
+            }
+        }
+
         // Пропускаем пробелы перед скобкой (бывает "MODECHECK (2)")
         let mut after_word = self.ch;
         while after_word.is_whitespace() && after_word != '\n' {
@@ -330,6 +353,18 @@ impl LexerInner {
             }
         }
         Token::Word(full)
+    }
+
+    /// Читает скорость шпинделя (S, S1, S2, SS1, SS2...).
+    /// Возвращает Token::Speed со всей строкой значения (например "S1000", "S1=1000", "SS1=500").
+    fn read_speed(&mut self) -> Token {
+        let mut full = String::from("S");
+        // Читаем всё до пробела, новой строки, точки с запятой
+        while self.ch != '\0' && !self.ch.is_whitespace() && self.ch != ';' {
+            full.push(self.ch);
+            self.read_char();
+        }
+        Token::Speed(full)
     }
 
     /// Читает число (целое или с плавающей точкой).

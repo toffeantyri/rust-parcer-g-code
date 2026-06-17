@@ -15,6 +15,8 @@ pub enum Token {
     Axis(String, Option<f64>, Option<usize>),
     /// Ось с алгебраическим выражением (Z=71.304, X=160+10)
     AxisExpr(String, String),
+    /// Скорость вращения шпинделя (S1000, S1=1000, S2=500)
+    Speed(String),
     Number(f64),
     /// Комментарий после `;`
     Comment(String),
