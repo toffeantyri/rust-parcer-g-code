@@ -22,7 +22,7 @@ rfd = "0.15"
 
 # GUI — wgpu вместо glow (исправляет баг glutin/wgl на Windows)
 # default-features = false выключает x11/wayland, поэтому добавляем явно
-eframe = { version = "0.31", default-features = false, features = ["default", "wgpu", "x11"] }
+eframe = { version = "0.31", default-features = false, features = ["default", "glow", "x11"] }
 egui = "0.31"
 
 # Сериализация настроек
