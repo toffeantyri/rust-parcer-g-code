@@ -1,0 +1,48 @@
+
+N10 WORKPIECE(,,,"CYLINDER",8384,0,-400,-300,205)
+N20 G0 SUPA X800
+N30 G54
+N40 T="DVJNL2525P16" D1 M6
+N50 LIMS=315
+N60 G96 M3 S50 M41
+G0 Z10
+N210 X360
+
+;--------------------------------------------
+R1 = 205 ;205 NAR DIAMETR REZBI     ; CONST
+R3 = 200 ;195 VNUTR DIAMETR REZBI  ; CONST
+
+R7 = 0.25 ; STEP BY X            ; IMMUTABLE
+R9 = -3.2 ; -2.8 ADD Z    	        ; IMMUTABLE
+R12 = 0.4; STEP ADD Z           ; IMMUTABLE
+
+R10 = R1 ; CURRENT X		; RT MUTABLE
+R6 = 0 ; CURRENT ADD Z		; RT MUTABLE
+;-------------------------------------------
+G0 G90 G54 Z10
+Y-7
+
+X360
+Z=R2
+X=R5
+R10 = R1-(R7*2) 
+M7
+WHILE R10 >= R3
+
+	Z=R2 
+		WHILE R6>=R9
+        MSG("ADD Z: "<<R6 <<" CURRENT X: "<<R10 )
+		Z=R2+R6
+		X=R10
+		G33 Z=R4 K=R8 SF=R11
+		G0 X=R5
+		R6 = R6-R12
+		ENDWHILE
+	R6=0
+	R10 = R10-(R7*2)
+
+ENDWHILE
+G0 G90 X360 M9
+M30
+
+
