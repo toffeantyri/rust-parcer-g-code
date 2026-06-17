@@ -2,10 +2,15 @@
 //!
 //! Проверки:
 //! - Ось без значения (например одинокий `X` без числа)
+//! - Ось с `=` без значения после равно (например `X=`)
+//! - Подозрительные двухбуквенные слова (например `XX`, `XZ`, `XX=`)
 //! - Пустая программа
 
 use crate::domain::Statement;
-use crate::shared::ValidationMessage;
+use crate::shared::{Severity, ValidationMessage};
+
+/// Буквы осей G-кода (должен совпадать с лексером)
+const AXIS_LETTERS: &str = "XYZABCUVWFSIJK";
 
 /// Проверяет программу (AST) на синтаксические ошибки.
 /// Возвращает список сообщений валидации с номерами строк.
@@ -30,6 +35,27 @@ pub fn validate(program: &[Statement]) -> Vec<ValidationMessage> {
                     messages.push(ValidationMessage::error(
                         line,
                         format!("Ось '{}' указана без значения", a.axis),
+                    ));
+                }
+            }
+            Statement::Word(word) => {
+                // Проверяем оси с `=` и пустым значением, например `X=`
+                // Word вида "X=" (одна буква + =) — ошибка
+                if word.len() == 2 && word.ends_with('=') {
+                    let axis = &word[..1];
+                    if AXIS_LETTERS.contains(axis) {
+                        messages.push(ValidationMessage::error(
+                            line,
+                            format!("Ось '{}' указана без значения", axis),
+                        ));
+                    }
+                // Подозрительные двухбуквенные слова, где первая буква — ось
+                // Например "XX", "XY", "XZ" — скорее всего опечатка
+                // Не проверяем если слово уже дало ошибку ("X=" и т.п.)
+                } else if word.len() == 2 && AXIS_LETTERS.contains(&word[..1]) {
+                    messages.push(ValidationMessage::warning(
+                        line,
+                        format!("Подозрительная конструкция '{}'. Возможно, опечатка.", word),
                     ));
                 }
             }
