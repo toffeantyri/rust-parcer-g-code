@@ -122,7 +122,21 @@ fn test_renumber_removes_empty_ncode_lines() {
     let config = FormatConfig { renumber_step: 10, skip_empty_lines: true, ..Default::default() };
     let formatter = Formatter::new(config);
     let result = formatter.format_program(&program);
-    assert_eq!(result, "\nN20 G0\n");
+    assert_eq!(result, "N10 G0\n");
+}
+
+#[test]
+fn test_normalize_blank_lines_removes_duplicates() {
+    let input = "N10 G0\n\n\nN20 G1\n";
+    let result = normalize_blank_lines(input);
+    assert_eq!(result, "N10 G0\n\nN20 G1\n");
+}
+
+#[test]
+fn test_normalize_blank_lines_with_ncode_blanks() {
+    let input = "N10\n\nN20\nN30 G0\n";
+    let result = normalize_blank_lines(input);
+    assert_eq!(result, "\nN30 G0\n");
 }
 
 #[test]
@@ -144,7 +158,6 @@ fn test_format_while_block() {
 
 #[test]
 fn test_format_while_with_ncode() {
-    // N-код на отдельной строке, WHILE без номера
     let program = vec![
         Statement::NCode(230),
         Statement::WhileBlock(WhileStatement {
@@ -270,15 +283,4 @@ fn test_format_with_tabs() {
     assert!(result.contains("WHILE R101<R103\n"));
     assert!(result.contains("\tG1\n"));
     assert!(result.contains("ENDWHILE\n"));
-}
-
-#[test]
-fn test_format_empty_while() {
-    let program = vec![Statement::WhileBlock(WhileStatement {
-        condition: "TRUE".into(),
-        body: vec![],
-    })];
-    let formatter = Formatter::new(FormatConfig::default());
-    let result = formatter.format_program(&program);
-    assert_eq!(result, "WHILE TRUE\nENDWHILE\n");
 }

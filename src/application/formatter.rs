@@ -53,11 +53,16 @@ impl Formatter {
     pub fn format_program(&self, program: &[Statement]) -> String {
         let formatted = self.format_block(program, 0);
         if self.config.renumber_step > 0 {
-            apply_renumbering(
+            let formatted = apply_renumbering(
                 &formatted,
                 self.config.renumber_step,
                 self.config.skip_empty_lines,
-            )
+            );
+            if self.config.skip_empty_lines {
+                normalize_blank_lines(&formatted)
+            } else {
+                formatted
+            }
         } else {
             formatted
         }
@@ -129,12 +134,16 @@ impl Formatter {
 
         // Тело
         let body = self.format_block(&w.body, indent_level + 1);
-        let lines: Vec<&str> = body.lines().collect();
-        for line in &lines {
-            if line.trim().is_empty() {
-                out.push('\n');
-            } else {
-                out.push_str(&format!("{}{}\n", body_indent, line));
+        let body = body.trim_start_matches('\n');
+        let body = body.trim_end_matches('\n');
+        if !body.is_empty() {
+            for line in body.lines() {
+                let trimmed = line.trim();
+                if trimmed.is_empty() {
+                    out.push('\n');
+                } else {
+                    out.push_str(&format!("{}{}\n", body_indent, line));
+                }
             }
         }
 
@@ -290,9 +299,7 @@ fn apply_renumbering(text: &str, step: u32, skip_empty_lines: bool) -> String {
             let after_n = without_n.trim();
             if after_n.is_empty() {
                 // Была строка только с N-кодом — удаляем, но счётчик увеличиваем
-                // и оставляем пустую строку
-                current_n += step;
-                result.push('\n');
+                // Не добавляем \n, чтобы следующая строка могла встать на ту же строку
                 continue;
             }
             // Если после удаления N-кода остался только комментарий — не нумеруем
@@ -308,6 +315,41 @@ fn apply_renumbering(text: &str, step: u32, skip_empty_lines: bool) -> String {
 
         current_n += step;
         result.push_str(&format!("N{} {}\n", current_n, clean_line.trim()));
+    }
+
+    result
+}
+
+/// Схлопывает множественные пустые строки в одну.
+/// Оставляет не больше одной пустой строки подряд.
+fn normalize_blank_lines(text: &str) -> String {
+    let mut result = String::new();
+    let mut prev_was_blank = false;
+
+    for line in text.lines() {
+        let trimmed = line.trim();
+        let is_blank = trimmed.is_empty()
+            || (trimmed.starts_with('N') || trimmed.starts_with('n'))
+                && trimmed[1..].chars().all(|c| c.is_ascii_digit());
+
+        if is_blank {
+            if !prev_was_blank {
+                // Оставляем одну пустую строку
+                prev_was_blank = true;
+            }
+            // Вторую и последующие — пропускаем
+        } else {
+            if prev_was_blank {
+                result.push('\n');
+                prev_was_blank = false;
+            }
+            result.push_str(line);
+            result.push('\n');
+        }
+    }
+
+    if prev_was_blank {
+        result.push('\n');
     }
 
     result
