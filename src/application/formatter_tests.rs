@@ -6,13 +6,35 @@ use crate::domain::*;
 #[test]
 fn test_format_simple_program() {
     let program = vec![
-        Statement::Motion(MotionStatement { code: 0, rapid: true }),
-        Statement::Axis(AxisStatement { axis: "X".to_string(), value: Some(10.0), decimal_places: None }),
-        Statement::Axis(AxisStatement { axis: "Y".to_string(), value: Some(20.0), decimal_places: None }),
+        Statement::Motion(MotionStatement {
+            code: 0,
+            rapid: true,
+        }),
+        Statement::Axis(AxisStatement {
+            axis: "X".to_string(),
+            value: Some(10.0),
+            decimal_places: None,
+        }),
+        Statement::Axis(AxisStatement {
+            axis: "Y".to_string(),
+            value: Some(20.0),
+            decimal_places: None,
+        }),
         Statement::NewLine,
-        Statement::Motion(MotionStatement { code: 1, rapid: false }),
-        Statement::Axis(AxisStatement { axis: "Z".to_string(), value: Some(5.5), decimal_places: Some(1) }),
-        Statement::Axis(AxisStatement { axis: "F".to_string(), value: Some(100.0), decimal_places: None }),
+        Statement::Motion(MotionStatement {
+            code: 1,
+            rapid: false,
+        }),
+        Statement::Axis(AxisStatement {
+            axis: "Z".to_string(),
+            value: Some(5.5),
+            decimal_places: Some(1),
+        }),
+        Statement::Axis(AxisStatement {
+            axis: "F".to_string(),
+            value: Some(100.0),
+            decimal_places: None,
+        }),
     ];
     let formatter = Formatter::new(FormatConfig::default());
     let result = formatter.format_program(&program);
@@ -23,10 +45,16 @@ fn test_format_simple_program() {
 fn test_format_ncode() {
     let program = vec![
         Statement::NCode(100),
-        Statement::Motion(MotionStatement { code: 0, rapid: true }),
+        Statement::Motion(MotionStatement {
+            code: 0,
+            rapid: true,
+        }),
         Statement::NewLine,
         Statement::NCode(105),
-        Statement::Motion(MotionStatement { code: 1, rapid: false }),
+        Statement::Motion(MotionStatement {
+            code: 1,
+            rapid: false,
+        }),
     ];
     let formatter = Formatter::new(FormatConfig::default());
     let result = formatter.format_program(&program);
@@ -36,15 +64,23 @@ fn test_format_ncode() {
 #[test]
 fn test_format_with_raw() {
     let program = vec![
-        Statement::Motion(MotionStatement { code: 64, rapid: false }),
+        Statement::Motion(MotionStatement {
+            code: 64,
+            rapid: false,
+        }),
         Statement::Raw("CFTCP".to_string()),
         Statement::NewLine,
         Statement::Raw("MODECHECK".to_string()),
-        Statement::Comment(CommentStatement { text: "2".to_string() }),
+        Statement::Comment(CommentStatement {
+            text: "2".to_string(),
+        }),
         Statement::NewLine,
         Statement::Raw("MAMILL".to_string()),
         Statement::NewLine,
-        Statement::Motion(MotionStatement { code: 0, rapid: true }),
+        Statement::Motion(MotionStatement {
+            code: 0,
+            rapid: true,
+        }),
     ];
     let formatter = Formatter::new(FormatConfig::default());
     let result = formatter.format_program(&program);
@@ -57,7 +93,10 @@ fn test_format_empty_lines() {
     let program = vec![
         Statement::NewLine,
         Statement::NewLine,
-        Statement::Motion(MotionStatement { code: 0, rapid: true }),
+        Statement::Motion(MotionStatement {
+            code: 0,
+            rapid: true,
+        }),
     ];
     let formatter = Formatter::new(FormatConfig::default());
     let result = formatter.format_program(&program);
@@ -68,13 +107,23 @@ fn test_format_empty_lines() {
 fn test_renumber_step() {
     let program = vec![
         Statement::NCode(100),
-        Statement::Motion(MotionStatement { code: 0, rapid: true }),
+        Statement::Motion(MotionStatement {
+            code: 0,
+            rapid: true,
+        }),
         Statement::NewLine,
         Statement::NewLine,
         Statement::NCode(999),
-        Statement::Motion(MotionStatement { code: 1, rapid: false }),
+        Statement::Motion(MotionStatement {
+            code: 1,
+            rapid: false,
+        }),
     ];
-    let config = FormatConfig { renumber_step: 10, skip_empty_lines: true, ..Default::default() };
+    let config = FormatConfig {
+        renumber_step: 10,
+        skip_empty_lines: true,
+        ..Default::default()
+    };
     let formatter = Formatter::new(config);
     let result = formatter.format_program(&program);
     assert_eq!(result, "N10 G0\n\nN20 G1\n");
@@ -84,13 +133,23 @@ fn test_renumber_step() {
 fn test_renumber_skip_empty_false() {
     let program = vec![
         Statement::NCode(1),
-        Statement::Motion(MotionStatement { code: 0, rapid: true }),
+        Statement::Motion(MotionStatement {
+            code: 0,
+            rapid: true,
+        }),
         Statement::NewLine,
         Statement::NewLine,
         Statement::NCode(2),
-        Statement::Motion(MotionStatement { code: 1, rapid: false }),
+        Statement::Motion(MotionStatement {
+            code: 1,
+            rapid: false,
+        }),
     ];
-    let config = FormatConfig { renumber_step: 1, skip_empty_lines: false, ..Default::default() };
+    let config = FormatConfig {
+        renumber_step: 1,
+        skip_empty_lines: false,
+        ..Default::default()
+    };
     let formatter = Formatter::new(config);
     let result = formatter.format_program(&program);
     assert_eq!(result, "N1 G0\nN2\nN3 G1\n");
@@ -99,12 +158,26 @@ fn test_renumber_skip_empty_false() {
 #[test]
 fn test_renumber_adds_ncode_to_lines_without() {
     let program = vec![
-        Statement::Motion(MotionStatement { code: 0, rapid: true }),
-        Statement::Axis(AxisStatement { axis: "X".to_string(), value: Some(10.0), decimal_places: None }),
+        Statement::Motion(MotionStatement {
+            code: 0,
+            rapid: true,
+        }),
+        Statement::Axis(AxisStatement {
+            axis: "X".to_string(),
+            value: Some(10.0),
+            decimal_places: None,
+        }),
         Statement::NewLine,
-        Statement::Motion(MotionStatement { code: 1, rapid: false }),
+        Statement::Motion(MotionStatement {
+            code: 1,
+            rapid: false,
+        }),
     ];
-    let config = FormatConfig { renumber_step: 1, skip_empty_lines: true, ..Default::default() };
+    let config = FormatConfig {
+        renumber_step: 1,
+        skip_empty_lines: true,
+        ..Default::default()
+    };
     let formatter = Formatter::new(config);
     let result = formatter.format_program(&program);
     assert!(result.starts_with("N1 G0"));
@@ -117,9 +190,16 @@ fn test_renumber_removes_empty_ncode_lines() {
         Statement::NCode(100),
         Statement::NewLine,
         Statement::NCode(200),
-        Statement::Motion(MotionStatement { code: 0, rapid: true }),
+        Statement::Motion(MotionStatement {
+            code: 0,
+            rapid: true,
+        }),
     ];
-    let config = FormatConfig { renumber_step: 10, skip_empty_lines: true, ..Default::default() };
+    let config = FormatConfig {
+        renumber_step: 10,
+        skip_empty_lines: true,
+        ..Default::default()
+    };
     let formatter = Formatter::new(config);
     let result = formatter.format_program(&program);
     assert_eq!(result, "N10 G0\n");
@@ -144,8 +224,15 @@ fn test_format_while_block() {
     let program = vec![Statement::WhileBlock(WhileStatement {
         condition: "R101<R103".into(),
         body: vec![
-            Statement::Motion(MotionStatement { code: 1, rapid: false }),
-            Statement::Axis(AxisStatement { axis: "X".into(), value: Some(10.0), decimal_places: None }),
+            Statement::Motion(MotionStatement {
+                code: 1,
+                rapid: false,
+            }),
+            Statement::Axis(AxisStatement {
+                axis: "X".into(),
+                value: Some(10.0),
+                decimal_places: None,
+            }),
             Statement::NewLine,
         ],
     })];
@@ -163,14 +250,21 @@ fn test_format_while_with_ncode() {
         Statement::WhileBlock(WhileStatement {
             condition: "R101<R103".into(),
             body: vec![
-                Statement::Motion(MotionStatement { code: 1, rapid: false }),
+                Statement::Motion(MotionStatement {
+                    code: 1,
+                    rapid: false,
+                }),
                 Statement::NewLine,
             ],
         }),
     ];
     let formatter = Formatter::new(FormatConfig::default());
     let result = formatter.format_program(&program);
-    assert!(result.contains("N0230\nWHILE R101<R103\n"), "N-код должен быть на отдельной строке перед WHILE:\n{}", result);
+    assert!(
+        result.contains("N0230\nWHILE R101<R103\n"),
+        "N-код должен быть на отдельной строке перед WHILE:\n{}",
+        result
+    );
     assert!(result.contains("  G1\n"));
     assert!(result.contains("ENDWHILE\n"));
 }
@@ -180,13 +274,27 @@ fn test_format_if_else_block() {
     let program = vec![Statement::IfBlock(IfStatement {
         condition: "R101==0".into(),
         then_body: vec![
-            Statement::Motion(MotionStatement { code: 0, rapid: true }),
-            Statement::Axis(AxisStatement { axis: "X".into(), value: Some(10.0), decimal_places: None }),
+            Statement::Motion(MotionStatement {
+                code: 0,
+                rapid: true,
+            }),
+            Statement::Axis(AxisStatement {
+                axis: "X".into(),
+                value: Some(10.0),
+                decimal_places: None,
+            }),
             Statement::NewLine,
         ],
         else_body: Some(vec![
-            Statement::Motion(MotionStatement { code: 1, rapid: false }),
-            Statement::Axis(AxisStatement { axis: "Y".into(), value: Some(20.0), decimal_places: None }),
+            Statement::Motion(MotionStatement {
+                code: 1,
+                rapid: false,
+            }),
+            Statement::Axis(AxisStatement {
+                axis: "Y".into(),
+                value: Some(20.0),
+                decimal_places: None,
+            }),
             Statement::NewLine,
         ]),
     })];
@@ -207,8 +315,15 @@ fn test_format_nested_while() {
             Statement::WhileBlock(WhileStatement {
                 condition: "R102<R103".into(),
                 body: vec![
-                    Statement::Motion(MotionStatement { code: 1, rapid: false }),
-                    Statement::Axis(AxisStatement { axis: "X".into(), value: Some(10.0), decimal_places: None }),
+                    Statement::Motion(MotionStatement {
+                        code: 1,
+                        rapid: false,
+                    }),
+                    Statement::Axis(AxisStatement {
+                        axis: "X".into(),
+                        value: Some(10.0),
+                        decimal_places: None,
+                    }),
                     Statement::NewLine,
                 ],
             }),
@@ -229,7 +344,10 @@ fn test_format_if_without_else() {
     let program = vec![Statement::IfBlock(IfStatement {
         condition: "R101==0".into(),
         then_body: vec![
-            Statement::Motion(MotionStatement { code: 0, rapid: true }),
+            Statement::Motion(MotionStatement {
+                code: 0,
+                rapid: true,
+            }),
             Statement::NewLine,
         ],
         else_body: None,
@@ -250,7 +368,10 @@ fn test_format_nested_if() {
             Statement::IfBlock(IfStatement {
                 condition: "R102>0".into(),
                 then_body: vec![
-                    Statement::Motion(MotionStatement { code: 1, rapid: false }),
+                    Statement::Motion(MotionStatement {
+                        code: 1,
+                        rapid: false,
+                    }),
                     Statement::NewLine,
                 ],
                 else_body: None,
@@ -273,11 +394,18 @@ fn test_format_with_tabs() {
     let program = vec![Statement::WhileBlock(WhileStatement {
         condition: "R101<R103".into(),
         body: vec![
-            Statement::Motion(MotionStatement { code: 1, rapid: false }),
+            Statement::Motion(MotionStatement {
+                code: 1,
+                rapid: false,
+            }),
             Statement::NewLine,
         ],
     })];
-    let config = FormatConfig { use_spaces: false, indent_size: 2, ..Default::default() };
+    let config = FormatConfig {
+        use_spaces: false,
+        indent_size: 2,
+        ..Default::default()
+    };
     let formatter = Formatter::new(config);
     let result = formatter.format_program(&program);
     assert!(result.contains("WHILE R101<R103\n"));

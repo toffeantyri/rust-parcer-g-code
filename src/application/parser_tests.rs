@@ -31,7 +31,7 @@ fn test_parse_n_codes() {
 
 #[test]
 fn test_parse_full_input_snapshot() {
-    let input = std::fs::read_to_string("input_code.txt")
+    let input = std::fs::read_to_string("test_content/input_code.txt")
         .expect("input_code.txt должен существовать в корне проекта");
     let tokens = tokenize(&input);
     let mut parser = Parser::new(tokens);
@@ -56,8 +56,7 @@ fn test_parse_while_block() {
 
 #[test]
 fn test_parse_nested_while() {
-    let tokens =
-        tokenize("WHILE R101<R103\nWHILE R102<R103\nG1 X10\nENDWHILE\nENDWHILE");
+    let tokens = tokenize("WHILE R101<R103\nWHILE R102<R103\nG1 X10\nENDWHILE\nENDWHILE");
     let mut parser = Parser::new(tokens);
     let program = parser.parse_program().unwrap();
     assert_eq!(program.len(), 1);
@@ -143,7 +142,10 @@ fn test_parse_if_with_inner_while() {
     match &program[0] {
         Statement::IfBlock(i) => {
             assert_eq!(i.condition, "R101==0");
-            assert!(i.then_body.iter().any(|s| matches!(s, Statement::WhileBlock(_))));
+            assert!(i
+                .then_body
+                .iter()
+                .any(|s| matches!(s, Statement::WhileBlock(_))));
         }
         _ => panic!("Ожидался IfBlock"),
     }
@@ -158,7 +160,10 @@ fn test_parse_nested_if() {
     match &program[0] {
         Statement::IfBlock(outer) => {
             assert_eq!(outer.condition, "R101>0");
-            assert!(outer.then_body.iter().any(|s| matches!(s, Statement::IfBlock(_))));
+            assert!(outer
+                .then_body
+                .iter()
+                .any(|s| matches!(s, Statement::IfBlock(_))));
         }
         _ => panic!("Ожидался IfBlock"),
     }

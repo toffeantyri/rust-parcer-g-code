@@ -254,7 +254,7 @@ fn test_validate_code_multichar_words() {
 
 #[test]
 fn test_format_text_params() {
-    let path = "text_params.txt";
+    let path = "test_content/text_params.txt";
     let input = std::fs::read_to_string(path).expect("Не удалось прочитать text_params.txt");
     let result = format_code(&input, 0, true);
     assert!(
@@ -290,7 +290,7 @@ fn test_format_text_params() {
 
 #[test]
 fn test_format_text_params_renumber() {
-    let path = "text_params.txt";
+    let path = "test_content/text_params.txt";
     let input = std::fs::read_to_string(path).expect("Не удалось прочитать text_params.txt");
     let result = format_code(&input, 10, true);
     assert!(
@@ -348,7 +348,7 @@ fn test_format_text_params_renumber() {
 
 #[test]
 fn test_format_input_code() {
-    let path = "input_code.txt";
+    let path = "test_content/input_code.txt";
     let input = std::fs::read_to_string(path).expect("Не удалось прочитать input_code.txt");
 
     // Сначала смотрим ошибки валидации через validate_code
@@ -408,7 +408,7 @@ fn test_format_input_code() {
 
 #[test]
 fn test_debug_line22() {
-    let path = "input_code.txt";
+    let path = "test_content/input_code.txt";
     let input = std::fs::read_to_string(path).expect("Не удалось прочитать input_code.txt");
     let line = input.lines().nth(21).expect("В файле меньше 22 строк");
     println!("line22: '{}'", line);
@@ -418,7 +418,7 @@ fn test_debug_line22() {
 
 #[test]
 fn test_debug_axis() {
-    let path = "input_code.txt";
+    let path = "test_content/input_code.txt";
     let input = std::fs::read_to_string(path).expect("Не удалось прочитать input_code.txt");
     let tokens = crate::infrastructure::lexer::tokenize(&input);
 
