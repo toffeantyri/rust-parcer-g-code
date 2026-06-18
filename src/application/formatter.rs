@@ -147,8 +147,8 @@ impl Formatter {
             }
         }
 
-        // ENDWHILE
-        out.push_str(&format!("{}ENDWHILE\n", indent));
+        // ENDWHILE — на уровне тела
+        out.push_str(&format!("{}ENDWHILE\n", body_indent));
 
         out
     }
@@ -186,8 +186,8 @@ impl Formatter {
             }
         }
 
-        // ENDIF
-        out.push_str(&format!("{}ENDIF\n", indent));
+        // ENDIF — на уровне тела
+        out.push_str(&format!("{}ENDIF\n", body_indent));
 
         out
     }
@@ -310,11 +310,18 @@ fn apply_renumbering(text: &str, step: u32, skip_empty_lines: bool) -> String {
             }
         }
 
-        // Удаляем старый N-код из начала строки
+        // Удаляем старый N-код из начала строки, если он есть
         let clean_line = trim_ncode(line);
+        // Сохраняем начальные пробелы (отступы) для вложенных блоков
+        let indent: String = line
+            .chars()
+            .take_while(|c| c.is_whitespace() && *c != '\n')
+            .collect();
 
         current_n += step;
-        result.push_str(&format!("N{} {}\n", current_n, clean_line.trim()));
+        // N-код в начале строки, за ним — отступы и содержимое
+        let content = clean_line.trim_start();
+        result.push_str(&format!("N{} {}{}\n", current_n, indent, content));
     }
 
     result
