@@ -109,6 +109,7 @@ impl<'a> Parser<'a> {
     // ── Парсинг блока (строка программы) ────────────────────────────
 
     /// Парсит блок токенов до NewLine или Eof (без Span).
+    #[allow(dead_code)]
     fn parse_block(&mut self) -> Vec<Token> {
         self.parse_block_spanned()
             .into_iter()
@@ -186,6 +187,7 @@ impl<'a> Parser<'a> {
 
     // ── Парсинг комментария ─────────────────────────────────────────
 
+    #[allow(dead_code)]
     fn parse_comment(&mut self) -> Token {
         let (t, _) = self.parse_comment_spanned(Span { start: 0, end: 0 });
         t
@@ -200,6 +202,7 @@ impl<'a> Parser<'a> {
 
     // ── G-код ───────────────────────────────────────────────────────
 
+    #[allow(dead_code)]
     fn try_parse_gcode(&mut self) -> Option<Token> {
         self.try_parse_gcode_spanned().map(|(t, _)| t)
     }
@@ -229,6 +232,7 @@ impl<'a> Parser<'a> {
 
     // ── M-код ───────────────────────────────────────────────────────
 
+    #[allow(dead_code)]
     fn try_parse_mcode(&mut self) -> Option<Token> {
         self.try_parse_mcode_spanned().map(|(t, _)| t)
     }
@@ -256,6 +260,7 @@ impl<'a> Parser<'a> {
 
     // ── N-код (номер кадра) ─────────────────────────────────────────
 
+    #[allow(dead_code)]
     fn try_parse_ncode(&mut self) -> Option<Token> {
         self.try_parse_ncode_spanned().map(|(t, _)| t)
     }
@@ -283,6 +288,7 @@ impl<'a> Parser<'a> {
 
     // ── Speed (скорость шпинделя S или подача F) ──────────────────
 
+    #[allow(dead_code)]
     fn try_parse_speed(&mut self) -> Option<Token> {
         self.try_parse_speed_spanned().map(|(t, _)| t)
     }
@@ -342,6 +348,7 @@ impl<'a> Parser<'a> {
 
     // ── R-параметр ─────────────────────────────────────────────────
 
+    #[allow(dead_code)]
     fn try_parse_r_parameter(&mut self) -> Option<Token> {
         self.try_parse_r_parameter_spanned().map(|(t, _)| t)
     }
@@ -397,6 +404,7 @@ impl<'a> Parser<'a> {
 
     // ── Ось ─────────────────────────────────────────────────────────
 
+    #[allow(dead_code)]
     fn try_parse_axis(&mut self) -> Option<Token> {
         self.try_parse_axis_spanned().map(|(t, _)| t)
     }
@@ -443,6 +451,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Собирает ось со значением: `X10.5`, `X-10.5`, `X` (без значения).
+    #[allow(dead_code)]
     fn parse_axis_value(&mut self) -> (Option<f64>, Option<usize>) {
         let (val, dec, _) = self.parse_axis_value_spanned();
         (val, dec)
@@ -486,6 +495,7 @@ impl<'a> Parser<'a> {
 
     // ── Слово / буква (многосимвольные слова, ключевые слова потока) ──
 
+    #[allow(dead_code)]
     fn try_parse_word_or_letter(&mut self) -> Option<Token> {
         self.try_parse_word_or_letter_spanned().map(|(t, _)| t)
     }
@@ -573,6 +583,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Завершает парсинг обычного слова: проверяет скобки или = выражение.
+    #[allow(dead_code)]
     fn finish_word(&mut self, word: String) -> Option<Token> {
         self.finish_word_spanned(word).map(|(t, _)| t)
     }
@@ -804,6 +815,7 @@ impl<'a> Parser<'a> {
     // ── Числовые хелперы ────────────────────────────────────────────
 
     /// Парсит число со знаком (опциональный минус + Number).
+    #[allow(dead_code)]
     fn parse_signed_number(&mut self) -> Option<f64> {
         self.parse_signed_number_spanned().map(|(n, _)| n)
     }
@@ -833,6 +845,7 @@ impl<'a> Parser<'a> {
     }
 
     /// Парсит только положительное число (без знака).
+    #[allow(dead_code)]
     fn parse_number_only(&mut self) -> Option<f64> {
         self.parse_number_only_spanned().map(|(n, _)| n)
     }

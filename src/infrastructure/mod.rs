@@ -3,6 +3,7 @@
 //! Содержит лексер (преобразование текста в токены) и другие адаптеры,
 //! реализующие доменные трейты.
 
+pub mod highlight;
 pub mod lexer;
 
 pub use lexer::DefaultLexer;
