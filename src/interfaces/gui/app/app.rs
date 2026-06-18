@@ -116,7 +116,8 @@ impl GCodeApp {
                     self.model.set_is_busy(false);
                     self.model
                         .set_status(i18n::locale().status.file_opened.to_string());
-                    self.model.set_error_lines(Vec::new()); // при загрузке нового файла ошибок нет
+                    self.model.set_error_lines(Vec::new());
+                    self.model.set_editor_needs_focus(true);
                 }
                 FileEvent::Saved { file_path } => {
                     self.model.set_file_path(file_path);

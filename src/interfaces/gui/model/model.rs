@@ -17,6 +17,7 @@ pub struct Model {
     pending_action: Option<PendingAction>,
     save_and_exec: Option<PendingAction>,
     error_lines: Vec<usize>,
+    editor_needs_focus: bool,
 }
 
 impl Model {
@@ -55,6 +56,9 @@ impl Model {
     }
     pub fn error_lines(&self) -> &[usize] {
         &self.error_lines
+    }
+    pub fn editor_needs_focus(&self) -> bool {
+        self.editor_needs_focus
     }
 }
 
@@ -97,6 +101,9 @@ impl Model {
     }
     pub fn set_error_lines(&mut self, v: Vec<usize>) {
         self.error_lines = v;
+    }
+    pub fn set_editor_needs_focus(&mut self, v: bool) {
+        self.editor_needs_focus = v;
     }
 }
 

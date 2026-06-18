@@ -230,12 +230,21 @@ pub fn view_editor(
     let mut edit_content = model.content().to_string();
 
     egui::CentralPanel::default().show(ctx, |ui| {
+        let editor_id = ui.next_auto_id();
+
+        // Если файл только что загружен — фокусируем редактор
+        if model.editor_needs_focus() {
+            ctx.memory_mut(|mem| mem.request_focus(editor_id));
+            model.set_editor_needs_focus(false);
+        }
+
         egui::ScrollArea::vertical()
             .id_salt("editor_scroll")
             .show(ui, |ui| {
                 ui.add_sized(
                     ui.available_size(),
                     egui::TextEdit::multiline(&mut edit_content)
+                        .id(editor_id)
                         .code_editor()
                         .desired_width(f32::INFINITY)
                         .desired_rows(50)
