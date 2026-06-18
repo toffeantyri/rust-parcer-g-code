@@ -157,6 +157,18 @@ pub fn spawn_data_layer() -> (mpsc::Sender<EditorCommand>, mpsc::Receiver<Editor
     (cmd_tx, evt_rx)
 }
 
+/// Читает содержимое файла, пробуя UTF-8, с fallback на ISO-8859-1 (Latin-1).
+/// G-код часто сохраняется в Windows-1251 / ISO-8859-1, что не является валидным UTF-8.
+fn read_file_content(path: &str) -> Result<String, String> {
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    // Пробуем UTF-8
+    if let Ok(s) = String::from_utf8(bytes.clone()) {
+        return Ok(s);
+    }
+    // Fallback: ISO-8859-1 — каждый байт 0x80..0xFF → U+0080..U+00FF
+    Ok(bytes.iter().map(|&b| b as char).collect())
+}
+
 /// Внутреннее состояние data layer.
 struct DataLayer {
     evt_tx: mpsc::Sender<EditorEvent>,
@@ -291,7 +303,7 @@ impl DataLayer {
                     FilePickerMode::Open => {
                         if let Some(path) = path {
                             self.current_file_path = Some(path.clone());
-                            match std::fs::read_to_string(&path) {
+                            match read_file_content(&path) {
                                 Ok(content) => {
                                     let content = content
                                         .replace("\r\n", "\n")
