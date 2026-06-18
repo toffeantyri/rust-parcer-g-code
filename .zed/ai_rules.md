@@ -30,8 +30,9 @@
 - Имена файлов: `snake_case.rs`.
 - Модуль domain: только `struct`, `enum`, `trait` без реализации внешних эффектов.
 - Модуль infrastructure: реализует трейты из domain (например `DefaultLexer` реализует `Lexer`).
-- Тесты: unit-тесты в `*_tests.rs` рядом с кодом (через `#[path = "..."]`).
-  Интеграционные GUI-тесты через `egui_kittest` — в `src/interfaces/gui/gui_tests.rs`.
+- Тесты: unit-тесты в `*_tests.rs` рядом с кодом (через `#[path = "..." ]`).
+  Интеграционные GUI-тесты через `egui_kittest` — в `tests/gui_tests.rs`
+  (отдельный интеграционный бинарник, не часть lib, из-за глобального i18n::LANG).
 
 ## Формат ответа (строго соблюдать)
 1. **Заголовок** `[План действий]` — 1-2 предложения, что будешь делать.
@@ -108,6 +109,7 @@ main thread (egui UI)
 - Архитектура: **MVI (Model-View-Intent)**.
   - `model/` — состояние приложения. Поля — приватные, доступ через геттеры (`.content()`, `.is_busy()` и т.д.),
     мутация — через `apply(intent)` или `pub(crate)` сеттеры (`.set_content()`, `.set_error_lines()` и т.д.).
+    Флаг `editor_needs_focus` — устанавливается при загрузке файла, сбрасывается после фокуса редактора.
   - `intent/` — намерения пользователя (enum).
   - `update/` — редьюсер: чистая функция, мутирует model на основе intent.
   - `view/` — отрисовка UI, возвращает intents.
@@ -124,7 +126,8 @@ main thread (egui UI)
 - Intent'ы, требующие работы data layer (Format, Validate, OpenFile, SaveFile), отправляются как `EditorCommand` в канал.
 - **Горячие клавиши**: F5 — форматировать, F6 — проверить, Ctrl+O — открыть, Ctrl+S — сохранить,
   Ctrl+Shift+S — сохранить как. Обрабатываются через `consume_key` в `app.rs::update()`.
-- **Подсветка синтаксиса**: через `TextEdit::layouter()` и `build_highlighted_job()`.
+- **Подсветка синтаксиса**: через `TextEdit::layouter()` и `infrastructure::highlight::build_highlighted_job()`.
+  Функция находится в `src/infrastructure/highlight.rs` (не в interfaces, чтобы не импортировать domain напрямую).
   Цвета токенов: G-коды салатовые, M-коды синие, оси жёлтые, AxisExpr тёмно-жёлтые,
   комментарии серые, WHILE/IF светло-бардовые, Word бардовые, Speed небесно-голубые,
   RParameter тёмно-синие.
@@ -144,8 +147,11 @@ main thread (egui UI)
   При форматировании незначащие нули отбрасываются: `X10.000` → `X10`, `X10.100` → `X10.1`.
 - **Многосимвольные команды** — `MODECHECK(2)`, `TRANS`, `MATLCH("...")`, `CFTCP`, `MAMILL`,
   `WGTRANS(1)`, `MSG("...")`, `MATLRET` и другие — обрабатываются как `Token::Word`, не изменяются.
-- **Управляющие конструкции** — `WHILE`, `IF`, `ELSE`, `ENDIF`, `ENDWHILE`, `REPEAT`, `UNTIL` —
-  обрабатываются как ключевые слова, формируют блоки `WhileBlock` / `IfBlock` с телом и отступами.
+- **Управляющие конструкции** — `WHILE`, `IF`, `ELSE`, `ENDIF`, `ENDWHILE`, `REPEAT`, `UNTIL`,
+  `FOR`, `ENDFOR`, `LOOP`, `ENDLOOP` — отдельные токены (`Token::WhileBlock`, `Token::EndWhile`,
+  `Token::IfBlock`, `Token::Else`, `Token::EndIf`, `Token::Repeat`, `Token::Until`,
+  `Token::For`, `Token::EndFor`, `Token::LoopBlock`, `Token::EndLoop`).
+  Формируют блоки `WhileBlock` / `IfBlock` с телом и отступами.
 - **Скобки `(...)` не комментарий** — выражения в скобках это параметры команд, а не комментарии. Только `;` начинает комментарий.
 - **Пустые строки сохраняются** — если в исходном коде есть пустая строка, она должна остаться и в отформатированном выводе.
   При перенумерации со `skip_empty_lines=true` множественные пустые строки схлопываются в одну.
