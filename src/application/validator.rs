@@ -7,7 +7,7 @@
 //! - Пустая программа
 
 use crate::domain::Statement;
-use crate::shared::{Severity, ValidationMessage};
+use crate::shared::ValidationMessage;
 
 /// Буквы осей G-кода (должен совпадать с лексером)
 const AXIS_LETTERS: &str = "XYZABCUVWFIJK";
@@ -30,31 +30,25 @@ pub fn validate(program: &[Statement]) -> Vec<ValidationMessage> {
             Statement::NewLine => {
                 line += 1;
             }
-            Statement::Axis(a) => {
-                if a.value.is_none() {
-                    messages.push(ValidationMessage::error(
-                        line,
-                        format!("Ось '{}' указана без значения", a.axis),
-                    ));
-                }
+            Statement::Axis(a) if a.value.is_none() => {
+                messages.push(ValidationMessage::error(
+                    line,
+                    format!("Ось '{}' указана без значения", a.axis),
+                ));
             }
-            Statement::Speed(s) => {
-                if s.trim().is_empty() || s == "S" || s == "S=" {
-                    messages.push(ValidationMessage::error(
-                        line,
-                        "Скорость шпинделя (S) указана без значения".to_string(),
-                    ));
-                }
+            Statement::Speed(s) if s.trim().is_empty() || s == "S" || s == "S=" => {
+                messages.push(ValidationMessage::error(
+                    line,
+                    "Скорость шпинделя (S) указана без значения".to_string(),
+                ));
             }
-            Statement::RParameter(r) => {
-                // RParameter должен быть непустым
-                if r.len() <= 1 || r == "R" || r == "R=" {
-                    messages.push(ValidationMessage::warning(
-                        line,
-                        "R-параметр без значения".to_string(),
-                    ));
-                }
+            Statement::RParameter(r) if r.len() <= 1 || r == "R" || r == "R=" => {
+                messages.push(ValidationMessage::warning(
+                    line,
+                    "R-параметр без значения".to_string(),
+                ));
             }
+            Statement::Axis(_) | Statement::Speed(_) | Statement::RParameter(_) => {}
             Statement::Word(word) => {
                 // Проверяем оси с `=` и пустым значением, например `X=`
                 // Word вида "X=" (одна буква + =) — ошибка

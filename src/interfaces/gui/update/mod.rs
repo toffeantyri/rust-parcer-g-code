@@ -4,4 +4,5 @@
 #[cfg(test)]
 #[path = "update_tests.rs"]
 mod tests;
+#[allow(clippy::module_inception)]
 mod update;

@@ -303,7 +303,7 @@ impl DataLayer {
                     FilePickerMode::Open => {
                         if let Some(path) = path {
                             self.current_file_path = Some(path.clone());
-                            match read_file_content(&path) {
+                            match read_file_content(path) {
                                 Ok(content) => {
                                     let content = content
                                         .replace("\r\n", "\n")
@@ -329,13 +329,13 @@ impl DataLayer {
                         if let Some(path) = path {
                             self.current_file_path = Some(path.clone());
                             let content = self.pending_save_content.take().unwrap_or_default();
-                            match std::fs::write(&path, &content) {
+                            match std::fs::write(path, &content) {
                                 Ok(_) => {
                                     self.send(EditorEvent::File(FileEvent::Saved {
                                         file_path: path.clone(),
                                     }));
                                     self.send(EditorEvent::Dialog(DialogEvent::NotifyUser {
-                                        message: i18n::fmt_saved(&path),
+                                        message: i18n::fmt_saved(path),
                                         level: NotifyLevel::Info,
                                     }));
                                 }

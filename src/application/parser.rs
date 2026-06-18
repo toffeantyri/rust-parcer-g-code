@@ -486,6 +486,7 @@ impl Parser {
         })
     }
 
+    #[allow(dead_code)]
     fn current_token(&self) -> &Token {
         &self.tokens[self.position]
     }

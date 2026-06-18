@@ -101,7 +101,7 @@ impl fmt::Display for Statement {
             }
             Statement::Comment(c) => write!(f, ";{}", c.text),
             Statement::Raw(r) => write!(f, "{}", r),
-            Statement::NewLine => write!(f, "\n"),
+            Statement::NewLine => writeln!(f),
             Statement::WhileBlock(w) => write!(f, "WHILE {}", w.condition),
             Statement::IfBlock(i) => write!(f, "IF {}", i.condition),
             Statement::Speed(s) => write!(f, "{}", s),

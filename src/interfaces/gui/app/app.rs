@@ -288,12 +288,13 @@ impl eframe::App for GCodeApp {
         let is_busy = self.model.is_busy();
 
         // === Проверка на закрытие окна ===
-        if ctx.input(|i| i.viewport().close_requested()) {
-            if self.model.modified() && !self.model.file_path().is_empty() {
-                ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
-                self.model.set_show_exit_dialog(true);
-                self.model.set_pending_action(Some(PendingAction::Exit));
-            }
+        if ctx.input(|i| i.viewport().close_requested())
+            && self.model.modified()
+            && !self.model.file_path().is_empty()
+        {
+            ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
+            self.model.set_show_exit_dialog(true);
+            self.model.set_pending_action(Some(PendingAction::Exit));
         }
 
         // === Получение событий от data layer ===

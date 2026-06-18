@@ -1,6 +1,7 @@
 //! Слой View — отрисовка UI, возвращает намерения.
 //! Содержит меню, тулбар, редактор, статусбар, диалоги.
 
+#[allow(clippy::module_inception)]
 mod view;
 
 pub use view::{

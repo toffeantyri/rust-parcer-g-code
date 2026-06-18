@@ -151,7 +151,7 @@ pub fn view_statusbar(model: &Model, ctx: &egui::Context) {
             let mut status = model.status().to_string();
             if model.is_busy() {
                 let dots = ((ctx.input(|i| i.time) * 4.0) as usize) % 4;
-                status.push_str(" ");
+                status.push(' ');
                 for i in 0..3 {
                     if i < dots {
                         status.push('.');
@@ -241,7 +241,7 @@ pub fn view_editor(
                         .desired_rows(50)
                         .font(TextStyle::Monospace)
                         .layouter(&mut |_ui: &egui::Ui, text: &str, _wrap_width: f32| {
-                            let job = build_highlighted_job(text, &model.error_lines());
+                            let job = build_highlighted_job(text, model.error_lines());
                             _ui.fonts(|f| f.layout_job(job))
                         }),
                 );
@@ -294,7 +294,7 @@ fn build_highlighted_job(text: &str, error_lines: &[usize]) -> egui::text::Layou
                 // R-параметры — тёмно-синий (только R + цифры)
                 } else if (w.starts_with('R') || w.starts_with('r'))
                     && w.len() > 1
-                    && w[1..].chars().next().map_or(false, |c| c.is_ascii_digit())
+                    && w[1..].chars().next().is_some_and(|c| c.is_ascii_digit())
                 {
                     Color32::from_rgb(30, 80, 160)
                 } else {

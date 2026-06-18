@@ -99,7 +99,7 @@ mod tests;
 // --- Сохранение и загрузка настроек ---
 
 fn settings_path() -> std::path::PathBuf {
-    let mut path = if let Some(home) = std::env::var("HOME").ok() {
+    let mut path = if let Ok(home) = std::env::var("HOME") {
         std::path::PathBuf::from(home)
     } else {
         std::path::PathBuf::from(".")

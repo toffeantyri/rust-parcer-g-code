@@ -18,6 +18,7 @@ path = "src/bin/cli_debug.rs"
 
 [dependencies]
 thiserror = "2.0"
+logos = "0.14"
 rfd = "0.15"
 
 # GUI — wgpu вместо glow (исправляет баг glutin/wgl на Windows)
