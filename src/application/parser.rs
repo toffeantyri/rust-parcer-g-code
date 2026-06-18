@@ -139,6 +139,8 @@ impl Parser {
                 Token::AxisExpr(axis, expr) => {
                     body.push(Statement::Word(format!("{}={}", axis, expr)))
                 }
+                Token::Speed(val) => body.push(Statement::Speed(val.clone())),
+                Token::RParameter(val) => body.push(Statement::RParameter(val.clone())),
                 Token::Comment(text) => {
                     body.push(Statement::Comment(CommentStatement { text: text.clone() }))
                 }
@@ -161,8 +163,6 @@ impl Parser {
         })
     }
 
-    /// Аналог parse_while_block, но для вложенных WHILE —
-    /// возвращает Result<Statement, ParseError> вместо Result<Option<Statement>, ParseError>.
     fn parse_while_block_inline(&mut self, word: &str) -> Result<Statement, ParseError> {
         let condition = if word.len() > 6 {
             word[6..].to_string()
@@ -214,6 +214,8 @@ impl Parser {
                 Token::AxisExpr(axis, expr) => {
                     body.push(Statement::Word(format!("{}={}", axis, expr)))
                 }
+                Token::Speed(val) => body.push(Statement::Speed(val.clone())),
+                Token::RParameter(val) => body.push(Statement::RParameter(val.clone())),
                 Token::Comment(text) => {
                     body.push(Statement::Comment(CommentStatement { text: text.clone() }))
                 }

@@ -113,6 +113,36 @@ fn main() {
     if !line.is_empty() {
         println!("{line}");
     }
+
+    // ── ФОРМАТТЕР ────────────────────────────────────────────────────
+    println!();
+    println!("══════════════════════════════════════════════════════════════");
+    println!("  ТЕКСТ ПОСЛЕ ФОРМАТТЕРА (лексер → парсер → форматтер)");
+    println!("══════════════════════════════════════════════════════════════");
+    println!();
+
+    use code_parser::application::{FormatConfig, Formatter, Parser};
+    use code_parser::shared::Severity;
+
+    let fmt_tokens = tokenize(&input);
+    let mut fmt_parser = Parser::new(fmt_tokens);
+    match fmt_parser.parse_program() {
+        Ok(program) => {
+            let config = FormatConfig {
+                uppercase_codes: true,
+                decimal_places: 5,
+                renumber_step: 0,
+                skip_empty_lines: true,
+                ..Default::default()
+            };
+            let formatter = Formatter::new(config);
+            let formatted = formatter.format_program(&program);
+            println!("{}", formatted);
+        }
+        Err(e) => {
+            eprintln!("Ошибка парсинга: {}", e);
+        }
+    }
 }
 
 /// Форматирует токен в пару (тип, значение) для табличного вывода
@@ -141,8 +171,10 @@ fn format_token(tok: &Token) -> (String, String) {
 }
 
 fn truncate(s: &str, max: usize) -> String {
-    if s.chars().count() > max {
-        format!("{}...", &s[..max - 3])
+    let chars: Vec<char> = s.chars().collect();
+    if chars.len() > max {
+        let truncated: String = chars[..max.saturating_sub(3)].iter().collect();
+        format!("{}...", truncated)
     } else {
         s.to_string()
     }
