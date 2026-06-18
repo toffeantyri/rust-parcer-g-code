@@ -412,3 +412,118 @@ fn test_format_with_tabs() {
     assert!(result.contains("\tG1\n"));
     assert!(result.contains("ENDWHILE\n"));
 }
+
+#[test]
+fn test_format_speed() {
+    let program = vec![
+        Statement::Speed("S1000".to_string()),
+        Statement::NewLine,
+        Statement::Speed("F200".to_string()),
+        Statement::NewLine,
+    ];
+    let formatter = Formatter::new(FormatConfig::default());
+    let result = formatter.format_program(&program);
+    assert!(result.contains("S1000"));
+    assert!(result.contains("F200"));
+}
+
+#[test]
+fn test_format_rparam() {
+    let program = vec![
+        Statement::RParameter("R50".to_string()),
+        Statement::NewLine,
+        Statement::RParameter("R101=R101+1".to_string()),
+        Statement::NewLine,
+    ];
+    let formatter = Formatter::new(FormatConfig::default());
+    let result = formatter.format_program(&program);
+    assert!(result.contains("R50\n"));
+    assert!(result.contains("R101=R101+1\n"));
+}
+
+#[test]
+fn test_format_axis_expr() {
+    let program = vec![
+        Statement::Word("Z=71.304".to_string()),
+        Statement::NewLine,
+        Statement::Word("X=160+10".to_string()),
+        Statement::NewLine,
+    ];
+    let formatter = Formatter::new(FormatConfig::default());
+    let result = formatter.format_program(&program);
+    assert!(result.contains("Z=71.304\n"));
+    assert!(result.contains("X=160+10\n"));
+}
+
+#[test]
+fn test_format_nested_three_levels() {
+    let program = vec![Statement::WhileBlock(WhileStatement {
+        condition: "R1<R2".into(),
+        body: vec![
+            Statement::WhileBlock(WhileStatement {
+                condition: "R3<R4".into(),
+                body: vec![
+                    Statement::WhileBlock(WhileStatement {
+                        condition: "R5<R6".into(),
+                        body: vec![
+                            Statement::Motion(MotionStatement {
+                                code: 1,
+                                rapid: false,
+                            }),
+                            Statement::NewLine,
+                        ],
+                    }),
+                    Statement::NewLine,
+                ],
+            }),
+            Statement::NewLine,
+        ],
+    })];
+    let formatter = Formatter::new(FormatConfig::default());
+    let result = formatter.format_program(&program);
+    assert!(result.contains("WHILE R1<R2\n"));
+    assert!(result.contains("  WHILE R3<R4\n"));
+    assert!(result.contains("    WHILE R5<R6\n"));
+    assert!(result.contains("      G1\n"));
+    assert!(result.contains("    ENDWHILE\n"));
+    assert!(result.contains("  ENDWHILE\n"));
+    assert!(result.contains("ENDWHILE\n"));
+}
+
+#[test]
+fn test_format_comment_standalone() {
+    let program = vec![
+        Statement::Comment(CommentStatement {
+            text: " standalone comment ".to_string(),
+        }),
+        Statement::NewLine,
+    ];
+    let formatter = Formatter::new(FormatConfig::default());
+    let result = formatter.format_program(&program);
+    assert_eq!(result, "; standalone comment \n");
+}
+
+#[test]
+fn test_format_renumber_preserves_indent() {
+    // Проверяем, что при перенумерации сохраняются отступы
+    let program = vec![Statement::WhileBlock(WhileStatement {
+        condition: "R1<R2".into(),
+        body: vec![
+            Statement::Motion(MotionStatement {
+                code: 0,
+                rapid: true,
+            }),
+            Statement::NewLine,
+        ],
+    })];
+    let config = FormatConfig {
+        renumber_step: 10,
+        skip_empty_lines: true,
+        ..Default::default()
+    };
+    let formatter = Formatter::new(config);
+    let result = formatter.format_program(&program);
+    // Должен быть отступ перед G0 внутри WHILE
+    // Формат: N20 + пробел + 2 пробела отступа + G0 = 3 пробела
+    assert!(result.contains("N20   G0"));
+}

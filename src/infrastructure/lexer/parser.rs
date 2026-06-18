@@ -1099,8 +1099,178 @@ mod tests {
     }
 
     #[test]
-    fn test_word_without_args() {
-        let tokens = tokenize("MAMILL");
-        assert_eq!(tokens, vec![Token::Word("MAMILL".to_string())]);
+    fn test_else_keyword() {
+        let tokens = tokenize("ELSE");
+        assert_eq!(tokens, vec![Token::Else]);
+    }
+
+    #[test]
+    fn test_endif_keyword() {
+        let tokens = tokenize("ENDIF");
+        assert_eq!(tokens, vec![Token::EndIf]);
+    }
+
+    #[test]
+    fn test_repeat_keyword() {
+        let tokens = tokenize("REPEAT");
+        assert_eq!(tokens, vec![Token::Repeat]);
+    }
+
+    #[test]
+    fn test_until_keyword() {
+        let tokens = tokenize("UNTIL R101>=R103");
+        assert_eq!(tokens, vec![Token::Until("R101>=R103".to_string())]);
+    }
+
+    #[test]
+    fn test_for_keyword() {
+        let tokens = tokenize("FOR R1=1 TO 10");
+        assert_eq!(tokens, vec![Token::For("R1=1 TO 10".to_string())]);
+    }
+
+    #[test]
+    fn test_endfor_keyword() {
+        let tokens = tokenize("ENDFOR");
+        assert_eq!(tokens, vec![Token::EndFor]);
+    }
+
+    #[test]
+    fn test_loop_keyword() {
+        let tokens = tokenize("LOOP");
+        assert_eq!(tokens, vec![Token::LoopBlock("".to_string())]);
+    }
+
+    #[test]
+    fn test_endloop_keyword() {
+        let tokens = tokenize("ENDLOOP");
+        assert_eq!(tokens, vec![Token::EndLoop]);
+    }
+
+    #[test]
+    fn test_word_d1() {
+        // D1 — буква + число без пробела
+        let tokens = tokenize("D1");
+        assert_eq!(tokens, vec![Token::Word("D1".to_string())]);
+    }
+
+    #[test]
+    fn test_word_t_with_string() {
+        // T="TOOL_NAME" — строка в кавычках
+        let tokens = tokenize(r###"T="DVJNL2525P16""###);
+        assert_eq!(
+            tokens,
+            vec![Token::Word(r###"T="DVJNL2525P16""###.to_string())]
+        );
+    }
+
+    #[test]
+    fn test_word_lims_equals() {
+        // LIMS=315 — слово с = выражением
+        let tokens = tokenize("LIMS=315");
+        assert_eq!(tokens, vec![Token::Word("LIMS=315".to_string())]);
+    }
+
+    #[test]
+    fn test_gcode_with_feed() {
+        // G1 Z=-R101 F1 M8
+        let tokens = tokenize("G1 Z=-R101 F1 M8");
+        assert_eq!(
+            tokens,
+            vec![
+                Token::GCode(1),
+                Token::AxisExpr("Z".to_string(), "-R101".to_string()),
+                Token::Speed("F1".to_string()),
+                Token::MCode(8),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_system_var_in_rparam() {
+        // R50=$TC_MPP6[9998,1]
+        let tokens = tokenize("R50=$TC_MPP6[9998,1]");
+        assert_eq!(tokens.len(), 1);
+        assert_eq!(
+            tokens[0],
+            Token::RParameter("R50=$TC_MPP6[9998,1]".to_string())
+        );
+    }
+
+    #[test]
+    fn test_checkmaxr_command() {
+        let tokens = tokenize("CHECKMAXR(8)");
+        assert_eq!(tokens, vec![Token::Word("CHECKMAXR(8)".to_string())]);
+    }
+
+    #[test]
+    fn test_multiple_axis_expressions() {
+        // Z=71.304 X=160+10 Y=3*5/2 — три AxisExpr подряд
+        let tokens = tokenize("Z=71.304 X=160+10 Y=3*5/2");
+        assert_eq!(
+            tokens,
+            vec![
+                Token::AxisExpr("Z".to_string(), "71.304".to_string()),
+                Token::AxisExpr("X".to_string(), "160+10".to_string()),
+                Token::AxisExpr("Y".to_string(), "3*5/2".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_number_as_separate_token() {
+        // Число без буквы перед ним — отдельный Number токен
+        let tokens = tokenize("123");
+        assert_eq!(tokens, vec![Token::Number(123.0)]);
+    }
+
+    #[test]
+    fn test_comment_after_code() {
+        // Комментарий после команды
+        let tokens = tokenize("G0 X10 ; this is comment");
+        assert_eq!(
+            tokens,
+            vec![
+                Token::GCode(0),
+                Token::Axis("X".to_string(), Some(10.0), None),
+                Token::Comment(" this is comment".to_string()),
+            ]
+        );
+    }
+
+    #[test]
+    fn test_word_uppercase_axis_letters() {
+        // Все оси X Y Z A B C U V W I J K
+        for axis in &["X", "Y", "Z", "A", "B", "C", "U", "V", "W", "I", "J", "K"] {
+            let input = format!("G0 {}10", axis);
+            let tokens = tokenize(&input);
+            assert_eq!(tokens[0], Token::GCode(0), "GCode для {}", input);
+            assert_eq!(
+                tokens[1],
+                Token::Axis(axis.to_string(), Some(10.0), None),
+                "Ось {}10",
+                axis
+            );
+        }
+    }
+
+    #[test]
+    fn test_semicolon_only() {
+        // Только точка с запятой (пустой комментарий)
+        let tokens = tokenize(";");
+        assert_eq!(tokens, vec![Token::Comment("".to_string())]);
+    }
+
+    #[test]
+    fn test_else_lowercase() {
+        let tokens = tokenize("else");
+        assert_eq!(tokens, vec![Token::Else]);
+    }
+
+    #[test]
+    fn test_repeat_until_lowercase() {
+        let tokens = tokenize("repeat");
+        assert_eq!(tokens, vec![Token::Repeat]);
+        let tokens = tokenize("until R1>5");
+        assert_eq!(tokens, vec![Token::Until("R1>5".to_string())]);
     }
 }

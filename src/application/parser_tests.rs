@@ -168,3 +168,104 @@ fn test_parse_nested_if() {
         _ => panic!("Ожидался IfBlock"),
     }
 }
+
+#[test]
+fn test_parse_empty_program() {
+    let tokens = vec![];
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse_program().unwrap();
+    assert!(program.is_empty());
+}
+
+#[test]
+fn test_parse_while_with_flow_tokens() {
+    let tokens = vec![
+        Token::WhileBlock("R101<R103".to_string()),
+        Token::GCode(1),
+        Token::NewLine,
+        Token::EndWhile,
+    ];
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse_program().unwrap();
+    assert_eq!(program.len(), 1);
+    match &program[0] {
+        Statement::WhileBlock(w) => {
+            assert_eq!(w.condition, "R101<R103");
+            assert_eq!(w.body.len(), 2);
+        }
+        _ => panic!("Expected WhileBlock"),
+    }
+}
+
+#[test]
+fn test_parse_if_with_flow_tokens() {
+    let tokens = vec![
+        Token::IfBlock("R101==0".to_string()),
+        Token::GCode(0),
+        Token::NewLine,
+        Token::EndIf,
+    ];
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse_program().unwrap();
+    assert_eq!(program.len(), 1);
+    match &program[0] {
+        Statement::IfBlock(i) => {
+            assert_eq!(i.condition, "R101==0");
+            assert_eq!(i.then_body.len(), 2);
+            assert!(i.else_body.is_none());
+        }
+        _ => panic!("Expected IfBlock"),
+    }
+}
+
+#[test]
+fn test_parse_speed_tokens() {
+    let tokens = tokenize("S1000 F200");
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse_program().unwrap();
+    assert_eq!(program.len(), 2);
+    assert_eq!(program[0], Statement::Speed("S1000".to_string()));
+    assert_eq!(program[1], Statement::Speed("F200".to_string()));
+}
+
+#[test]
+fn test_parse_while_nested_flow_tokens() {
+    let tokens = vec![
+        Token::WhileBlock("R1<R2".to_string()),
+        Token::WhileBlock("R3<R4".to_string()),
+        Token::GCode(1),
+        Token::NewLine,
+        Token::EndWhile,
+        Token::NewLine,
+        Token::EndWhile,
+    ];
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse_program().unwrap();
+    assert_eq!(program.len(), 1);
+    match &program[0] {
+        Statement::WhileBlock(outer) => {
+            assert_eq!(outer.body.len(), 2);
+            match &outer.body[0] {
+                Statement::WhileBlock(inner) => {
+                    assert_eq!(inner.body.len(), 2);
+                }
+                _ => panic!("Expected inner WhileBlock"),
+            }
+        }
+        _ => panic!("Expected outer WhileBlock"),
+    }
+}
+
+#[test]
+fn test_parse_comment_token() {
+    let tokens = tokenize("; just a comment");
+    let mut parser = Parser::new(tokens);
+    let program = parser.parse_program().unwrap();
+    assert_eq!(program.len(), 1);
+    assert_eq!(
+        program[0],
+        Statement::Comment(CommentStatement {
+            text: " just a comment".to_string()
+        })
+    );
+}
