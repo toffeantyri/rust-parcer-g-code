@@ -390,3 +390,61 @@ fn test_intent_toggle_shortcuts() {
     app.handle_intent(&Intent::ToggleShortcuts);
     assert!(!app.model.shortcuts_open());
 }
+
+// -----------------------------------------------------------------------
+// Горячие клавиши (через handle_intent)
+// -----------------------------------------------------------------------
+
+#[test]
+fn test_hotkey_format_sends_format_intent() {
+    let mut app = make_app_with_content("G0 X10", "");
+    app.handle_intent(&Intent::Format);
+    assert!(app.model.is_busy());
+    assert_eq!(
+        app.model.status(),
+        crate::shared::i18n::locale().status.formatting.to_string()
+    );
+}
+
+#[test]
+fn test_hotkey_validate_sends_validate_intent() {
+    let mut app = make_app_with_content("G0 X10", "");
+    app.handle_intent(&Intent::Validate);
+    assert!(app.model.is_busy());
+}
+
+#[test]
+fn test_hotkey_open_file_modified_shows_dialog() {
+    let mut app = make_app_with_content("G0 X10", "/path/file.nc");
+    app.handle_intent(&Intent::OpenFile);
+    assert!(app.model.show_exit_dialog());
+}
+
+#[test]
+fn test_hotkey_save_file_with_path() {
+    let mut app = make_app_with_content("G0 X10", "/path/file.nc");
+    app.handle_intent(&Intent::SaveFile);
+    assert!(app.model.is_busy());
+}
+
+#[test]
+fn test_hotkey_save_as_sets_busy() {
+    let mut app = make_app_with_content("G0 X10", "/path/file.nc");
+    app.handle_intent(&Intent::SaveAs);
+    assert!(app.model.is_busy());
+}
+
+#[test]
+fn test_hotkey_format_empty_shows_message() {
+    let mut app = make_app();
+    app.model.set_content("".to_string());
+    app.handle_intent(&Intent::Format);
+    assert_eq!(
+        app.model.status(),
+        crate::shared::i18n::locale()
+            .status
+            .empty_editor
+            .to_string()
+    );
+    assert!(!app.model.is_busy());
+}
