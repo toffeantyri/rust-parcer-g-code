@@ -19,7 +19,3 @@ pub(crate) mod intent;
 pub(crate) mod model;
 pub(crate) mod update;
 pub(crate) mod view;
-
-#[cfg(test)]
-#[path = "gui_tests.rs"]
-mod gui_tests;

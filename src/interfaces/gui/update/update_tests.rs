@@ -1,6 +1,15 @@
 use crate::interfaces::gui::intent::Intent;
 use crate::interfaces::gui::model::{Model, PendingAction};
 
+/// Блокировка для глобального состояния i18n::LANG.
+/// Все тесты, меняющие язык, должны использовать эту блокировку.
+fn with_i18n_lock() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+    LOCK.get_or_init(|| std::sync::Mutex::new(()))
+        .lock()
+        .unwrap()
+}
+
 fn make_model() -> Model {
     let mut m = Model::default();
     m.set_content("G0 X10 Y20".to_string());
@@ -125,6 +134,7 @@ fn test_cancel_action() {
 
 #[test]
 fn test_set_language_en() {
+    let _lock = with_i18n_lock();
     let mut m = Model::default();
     assert_eq!(m.format_settings().language, "ru");
     m.apply(&Intent::SetLanguage("en".to_string()));
@@ -136,6 +146,7 @@ fn test_set_language_en() {
 
 #[test]
 fn test_set_language_ru() {
+    let _lock = with_i18n_lock();
     let mut m = Model::default();
     m.apply(&Intent::SetLanguage("en".to_string()));
     m.apply(&Intent::SetLanguage("ru".to_string()));

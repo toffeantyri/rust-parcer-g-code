@@ -6,14 +6,25 @@
 use egui::accesskit::{Role, Toggled};
 use egui_kittest::{kittest::Queryable, Harness};
 
-use crate::data_layer::{EditorEvent, PipelineEvent};
-use crate::interfaces::gui::{
+use code_parser::data_layer::{EditorEvent, PipelineEvent};
+use code_parser::interfaces::gui::{
     collect_intents, view_editor, view_exit_dialog, view_settings, view_shortcuts, view_statusbar,
     FormatSettings, Model,
 };
-use crate::shared::i18n;
-use crate::shared::ValidationMessage;
-use std::sync::mpsc;
+use code_parser::shared::i18n;
+use code_parser::shared::ValidationMessage;
+
+/// Блокировка для глобального состояния i18n::LANG.
+/// Все GUI тесты, меняющие язык, должны использовать эту блокировку,
+/// чтобы избежать гонки за глобальный статик LANG.
+static I18N_LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
+
+fn with_i18n_lock() -> std::sync::MutexGuard<'static, ()> {
+    I18N_LOCK
+        .get_or_init(|| std::sync::Mutex::new(()))
+        .lock()
+        .unwrap()
+}
 
 // ---------------------------------------------------------------------------
 // Menu — File
@@ -21,6 +32,7 @@ use std::sync::mpsc;
 
 #[test]
 fn test_menu_file_items() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("en");
     let model = Model::default();
 
@@ -34,6 +46,7 @@ fn test_menu_file_items() {
     harness.run();
 
     assert!(harness.query_by_label("Open...").is_some());
+    // Save есть и в меню, и в тулбаре — используем query_all
     assert!(harness.query_all_by_label("Save").count() >= 2);
     assert!(harness.query_by_label("Save as...").is_some());
     assert!(harness.query_by_label("Close").is_some());
@@ -42,6 +55,7 @@ fn test_menu_file_items() {
 
 #[test]
 fn test_menu_file_items_ru() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("ru");
     let model = Model::default();
 
@@ -61,8 +75,13 @@ fn test_menu_file_items_ru() {
     assert!(harness.query_by_label("Выход").is_some());
 }
 
+// ---------------------------------------------------------------------------
+// Menu — Edit
+// ---------------------------------------------------------------------------
+
 #[test]
 fn test_menu_edit_items() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("en");
     let model = Model::default();
 
@@ -80,8 +99,13 @@ fn test_menu_edit_items() {
     assert!(harness.query_by_label("Format Settings...").is_some());
 }
 
+// ---------------------------------------------------------------------------
+// Toolbar buttons
+// ---------------------------------------------------------------------------
+
 #[test]
 fn test_toolbar_buttons() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("en");
     let model = Model::default();
 
@@ -98,6 +122,7 @@ fn test_toolbar_buttons() {
 
 #[test]
 fn test_toolbar_buttons_disabled_when_busy() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("en");
     let mut model = Model::default();
     model.set_is_busy(true);
@@ -107,11 +132,16 @@ fn test_toolbar_buttons_disabled_when_busy() {
     });
     harness.run();
 
-    assert!(harness.query_by_label("Open").is_some());
+    assert!(harness.query_by_label("Open").is_some()); // кнопка видна, но disabled
 }
+
+// ---------------------------------------------------------------------------
+// Editor
+// ---------------------------------------------------------------------------
 
 #[test]
 fn test_editor_is_present() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("en");
     let mut model = Model::default();
 
@@ -121,7 +151,7 @@ fn test_editor_is_present() {
         view_editor(
             &mut model,
             ui.ctx(),
-            &mpsc::channel().0,
+            &std::sync::mpsc::channel().0,
             &mut last_change,
             &mut pending,
         );
@@ -136,6 +166,7 @@ fn test_editor_is_present() {
 
 #[test]
 fn test_editor_shows_content() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("en");
     let mut model = Model::default();
     model.set_content("G0 X10 Y20\nG1 Z5.5".to_string());
@@ -146,7 +177,7 @@ fn test_editor_shows_content() {
         view_editor(
             &mut model,
             ui.ctx(),
-            &mpsc::channel().0,
+            &std::sync::mpsc::channel().0,
             &mut last_change,
             &mut pending,
         );
@@ -157,8 +188,13 @@ fn test_editor_shows_content() {
     assert_eq!(editor.value(), Some("G0 X10 Y20\nG1 Z5.5".to_string()));
 }
 
+// ---------------------------------------------------------------------------
+// Status bar
+// ---------------------------------------------------------------------------
+
 #[test]
 fn test_status_bar_shows_ready() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("en");
     let mut model = Model::default();
     model.set_status(i18n::locale().status.ready.clone());
@@ -173,8 +209,13 @@ fn test_status_bar_shows_ready() {
         .is_some());
 }
 
+// ---------------------------------------------------------------------------
+// Exit dialog
+// ---------------------------------------------------------------------------
+
 #[test]
 fn test_exit_dialog_shown_when_flag_set() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("en");
     let mut model = Model::default();
     model.set_show_exit_dialog(true);
@@ -195,6 +236,7 @@ fn test_exit_dialog_shown_when_flag_set() {
 
 #[test]
 fn test_exit_dialog_not_shown_without_flag() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("en");
     let model = Model::default();
 
@@ -206,8 +248,13 @@ fn test_exit_dialog_not_shown_without_flag() {
     assert!(harness.query_by_label("Save changes?").is_none());
 }
 
+// ---------------------------------------------------------------------------
+// Format Settings window
+// ---------------------------------------------------------------------------
+
 #[test]
 fn test_settings_window_shown_when_open() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("en");
     let mut model = Model::default();
     model.set_settings_open(true);
@@ -224,6 +271,7 @@ fn test_settings_window_shown_when_open() {
 
 #[test]
 fn test_settings_window_not_shown_by_default() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("en");
     let model = Model::default();
 
@@ -237,6 +285,7 @@ fn test_settings_window_not_shown_by_default() {
 
 #[test]
 fn test_settings_window_skip_empty_checkbox() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("en");
     let mut model = Model::default();
     model.set_settings_open(true);
@@ -254,8 +303,13 @@ fn test_settings_window_skip_empty_checkbox() {
     assert_eq!(checkbox.toggled(), Some(Toggled::False));
 }
 
+// ---------------------------------------------------------------------------
+// Language переключатель в Settings меню
+// ---------------------------------------------------------------------------
+
 #[test]
 fn test_settings_menu_language_toggle() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("ru");
     let mut model = Model::default();
     model.set_format_settings(FormatSettings {
@@ -268,6 +322,7 @@ fn test_settings_menu_language_toggle() {
     });
     harness.run();
 
+    // Открываем Настройки
     let settings = harness.get_by_label("Настройки");
     settings.click();
     harness.run();
@@ -276,8 +331,13 @@ fn test_settings_menu_language_toggle() {
     assert!(harness.query_by_label("Русский").is_some());
 }
 
+// ---------------------------------------------------------------------------
+// Shortcuts window
+// ---------------------------------------------------------------------------
+
 #[test]
 fn test_shortcuts_window_shown_when_open() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("en");
     let mut model = Model::default();
     model.set_shortcuts_open(true);
@@ -287,6 +347,7 @@ fn test_shortcuts_window_shown_when_open() {
     });
     harness.run();
 
+    // Окно горячих клавиш должно быть видно — проверяем по содержимому
     assert!(harness.query_by_label("Ctrl+O").is_some());
     assert!(harness.query_by_label("Ctrl+S").is_some());
     assert!(harness.query_by_label("F5").is_some());
@@ -295,6 +356,7 @@ fn test_shortcuts_window_shown_when_open() {
 
 #[test]
 fn test_shortcuts_window_not_shown_by_default() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("en");
     let model = Model::default();
 
@@ -308,6 +370,7 @@ fn test_shortcuts_window_not_shown_by_default() {
 
 #[test]
 fn test_shortcuts_window_shown_russian() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("ru");
     let mut model = Model::default();
     model.set_shortcuts_open(true);
@@ -324,21 +387,29 @@ fn test_shortcuts_window_shown_russian() {
     assert!(harness.query_by_label("Ctrl+S").is_some());
 }
 
+// ---------------------------------------------------------------------------
+// Error lines — проверка, что error_lines заполняется после Validate
+// ---------------------------------------------------------------------------
+
 #[test]
 fn test_validate_fills_error_lines() {
+    let _lock = with_i18n_lock();
     i18n::set_lang("en");
     let mut model = Model::default();
-    model.set_content("G0 X".to_string());
+    model.set_content("G0 X".to_string()); // ось X без значения — ошибка
 
-    let err = ValidationMessage::error(1, "ось X без значения");
-    let (tx, _) = mpsc::channel();
-    let (_evt_tx, evt_rx) = mpsc::channel();
-    let mut app = crate::interfaces::gui::GCodeApp::new(tx, evt_rx);
+    // Имитируем событие Validated, как это делает app.rs::handle_event
+    let err = code_parser::shared::ValidationMessage::error(1, "ось X без значения");
+
+    // Создаём GCodeApp, но напрямую вызываем handle_event
+    let (tx, _) = std::sync::mpsc::channel();
+    let (_evt_tx, evt_rx) = std::sync::mpsc::channel();
+    let mut app = code_parser::interfaces::gui::GCodeApp::new(tx, evt_rx);
     app.model.set_content("G0 X".to_string());
 
-    app.handle_event(EditorEvent::Pipeline(PipelineEvent::Validated {
-        errors: vec![err],
-    }));
+    app.handle_event(code_parser::data_layer::EditorEvent::Pipeline(
+        code_parser::data_layer::PipelineEvent::Validated { errors: vec![err] },
+    ));
 
     assert!(!app.model.error_lines().is_empty());
     assert_eq!(app.model.error_lines(), vec![1]);
