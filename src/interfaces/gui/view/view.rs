@@ -379,6 +379,12 @@ pub fn view_exit_dialog(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
         return intents;
     }
 
+    // Esc → отмена
+    if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Escape)) {
+        intents.push(Intent::CancelAction);
+        return intents;
+    }
+
     let mut is_open = true;
     egui::Window::new(&i18n::locale().dialog.exit_title)
         .open(&mut is_open)
@@ -389,15 +395,53 @@ pub fn view_exit_dialog(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
         .show(ctx, |ui| {
             ui.label(&i18n::locale().dialog.confirm_save);
             ui.add_space(12.0);
+
+            // Состояние выбранной кнопки (для навигации стрелками)
+            let btn_id = ui.id().with("exit_btn_idx");
+            let mut selected: usize = ctx.data_mut(|d| d.get_temp::<usize>(btn_id).unwrap_or(1));
+
+            // Стрелки для переключения кнопок
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowRight)) {
+                selected = (selected + 1).min(2);
+                ctx.data_mut(|d| d.insert_temp(btn_id, selected));
+            }
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::ArrowLeft)) {
+                selected = selected.saturating_sub(1);
+                ctx.data_mut(|d| d.insert_temp(btn_id, selected));
+            }
+
+            // Enter — подтвердить выбранную кнопку
+            if ctx.input_mut(|i| i.consume_key(egui::Modifiers::NONE, egui::Key::Enter)) {
+                match selected {
+                    0 => intents.push(Intent::ConfirmSave),
+                    1 => intents.push(Intent::DiscardAndContinue),
+                    _ => intents.push(Intent::CancelAction),
+                }
+            }
+
             ui.horizontal(|ui| {
-                if ui.button(&i18n::locale().dialog.btn_save).clicked() {
-                    intents.push(Intent::ConfirmSave);
-                }
-                if ui.button(&i18n::locale().dialog.btn_discard).clicked() {
-                    intents.push(Intent::DiscardAndContinue);
-                }
-                if ui.button(&i18n::locale().dialog.btn_cancel).clicked() {
-                    intents.push(Intent::CancelAction);
+                let labels = [
+                    &i18n::locale().dialog.btn_save,
+                    &i18n::locale().dialog.btn_discard,
+                    &i18n::locale().dialog.btn_cancel,
+                ];
+                let actions = [
+                    Intent::ConfirmSave,
+                    Intent::DiscardAndContinue,
+                    Intent::CancelAction,
+                ];
+
+                for (i, label) in labels.iter().enumerate() {
+                    let is_selected = i == selected;
+                    let btn = egui::Button::new(*label).min_size(egui::vec2(100.0, 30.0));
+                    let response = if is_selected {
+                        ui.add(btn.stroke(egui::Stroke::new(2.0, egui::Color32::WHITE)))
+                    } else {
+                        ui.add(btn)
+                    };
+                    if response.clicked() {
+                        intents.push(actions[i].clone());
+                    }
                 }
             });
         });

@@ -19,10 +19,6 @@ mod keywords;
 mod parser;
 mod raw_token;
 
-#[cfg(test)]
-#[path = "debug_indent.rs"]
-mod debug_indent;
-
 /// Стандартный лексер G-кода.
 /// Реализует доменный трейт `Lexer`.
 pub struct DefaultLexer {

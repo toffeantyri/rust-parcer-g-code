@@ -288,10 +288,16 @@ impl eframe::App for GCodeApp {
         let is_busy = self.model.is_busy();
 
         // === Проверка на закрытие окна ===
-        if ctx.input(|i| i.viewport().close_requested())
-            && self.model.modified()
-            && !self.model.file_path().is_empty()
-        {
+        if ctx.input(|i| i.viewport().close_requested()) {
+            if self.model.show_exit_dialog() {
+                // Диалог уже открыт — Alt+F4 или повторный клик → выходим без сохранения
+                return;
+            }
+            // Если нечего сохранять — выходим сразу
+            if !self.model.modified() || self.model.file_path().is_empty() {
+                return;
+            }
+            // Есть изменения — показываем диалог
             ctx.send_viewport_cmd(egui::ViewportCommand::CancelClose);
             self.model.set_show_exit_dialog(true);
             self.model.set_pending_action(Some(PendingAction::Exit));

@@ -1,7 +1,7 @@
 //! Intent — намерения пользователя
 
 /// Намерение пользователя — что он хочет сделать
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Intent {
     OpenFile,
     SaveFile,
