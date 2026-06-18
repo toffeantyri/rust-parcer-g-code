@@ -517,7 +517,7 @@ impl<'a> Parser<'a> {
             _ => return None,
         };
         let mut span = word_start_span;
-        let word = self.collect_word();
+        let mut word = self.collect_word();
 
         if word.is_empty() {
             return None;
@@ -526,6 +526,24 @@ impl<'a> Parser<'a> {
         // Расширяем span на все буквы слова
         if let Some(last) = self.tokens.get(self.pos.saturating_sub(1)) {
             span.end = last.1.end;
+        }
+
+        // Если слово не в словаре — пробуем присоединить примыкающее число
+        // (D1 → Word("D1"), а не Word("D") + Number(1))
+        // НО: если первая буква слова — ось, то число НЕ присоединяем
+        // (XX20 → Word("XX") + Number(20), чтобы валидатор мог найти XX)
+        if !self.dictionary.is_known(&word) {
+            let first_char = word.chars().next().unwrap_or(' ');
+            if !AXIS_LETTERS.contains(&first_char) {
+                if let Some((RawToken::Number(n), num_span)) = self.current() {
+                    // Проверяем, что число примыкает к последней букве
+                    if span.end == num_span.start {
+                        word.push_str(&format_number(n));
+                        span.end = num_span.end;
+                        self.advance();
+                    }
+                }
+            }
         }
 
         // Проверяем по словарю
