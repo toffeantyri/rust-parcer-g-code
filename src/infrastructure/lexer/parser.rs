@@ -87,12 +87,20 @@ impl<'a> Parser<'a> {
     /// Парсит всю программу и возвращает плоский `Vec<Token>`.
     /// `Eof` в публичный API не попадает.
     pub fn parse_program(&mut self) -> Vec<Token> {
+        self.parse_program_spanned()
+            .into_iter()
+            .map(|(t, _)| t)
+            .collect()
+    }
+
+    /// Парсит всю программу с возвратом Span для каждого токена.
+    pub fn parse_program_spanned(&mut self) -> Vec<(Token, Span)> {
         let mut result = Vec::new();
         loop {
             if self.current().is_none() {
                 break;
             }
-            let tokens = self.parse_block();
+            let tokens = self.parse_block_spanned();
             result.extend(tokens);
         }
         result
@@ -100,69 +108,76 @@ impl<'a> Parser<'a> {
 
     // ── Парсинг блока (строка программы) ────────────────────────────
 
-    /// Парсит блок токенов до NewLine или Eof.
+    /// Парсит блок токенов до NewLine или Eof (без Span).
     fn parse_block(&mut self) -> Vec<Token> {
+        self.parse_block_spanned()
+            .into_iter()
+            .map(|(t, _)| t)
+            .collect()
+    }
+
+    /// Парсит блок токенов до NewLine или Eof с возвратом Span.
+    fn parse_block_spanned(&mut self) -> Vec<(Token, Span)> {
         let mut result = Vec::new();
 
         loop {
             match self.current() {
                 None => break,
-                Some((RawToken::NewLine, _)) => {
+                Some((RawToken::NewLine, span)) => {
                     self.advance();
-                    result.push(Token::NewLine);
+                    result.push((Token::NewLine, span));
                     break;
                 }
-                Some((RawToken::Unknown(ch), _)) => {
+                Some((RawToken::Unknown(ch), span)) => {
                     self.advance();
-                    result.push(Token::Unknown(ch));
+                    result.push((Token::Unknown(ch), span));
                     continue;
                 }
-                Some((RawToken::Comment(_), _)) => {
-                    // Комментарий может быть на отдельной строке
-                    result.push(self.parse_comment());
+                Some((RawToken::Comment(_), span)) => {
+                    result.push(self.parse_comment_spanned(span));
                     continue;
                 }
-                Some((RawToken::SystemVar(s), _)) => {
+                Some((RawToken::SystemVar(s), span)) => {
                     self.advance();
-                    result.push(Token::Word(s.to_string()));
+                    result.push((Token::Word(s.to_string()), span));
                     continue;
                 }
                 _ => {}
             }
 
             // Пробуем распознать конструкцию
-            if let Some(tok) = self.try_parse_ncode() {
-                result.push(tok);
+            if let Some((tok, span)) = self.try_parse_ncode_spanned() {
+                result.push((tok, span));
                 continue;
             }
-            if let Some(tok) = self.try_parse_gcode() {
-                result.push(tok);
+            if let Some((tok, span)) = self.try_parse_gcode_spanned() {
+                result.push((tok, span));
                 continue;
             }
-            if let Some(tok) = self.try_parse_mcode() {
-                result.push(tok);
+            if let Some((tok, span)) = self.try_parse_mcode_spanned() {
+                result.push((tok, span));
                 continue;
             }
-            if let Some(tok) = self.try_parse_speed() {
-                result.push(tok);
+            if let Some((tok, span)) = self.try_parse_speed_spanned() {
+                result.push((tok, span));
                 continue;
             }
-            if let Some(tok) = self.try_parse_r_parameter() {
-                result.push(tok);
+            if let Some((tok, span)) = self.try_parse_r_parameter_spanned() {
+                result.push((tok, span));
                 continue;
             }
-            if let Some(tok) = self.try_parse_axis() {
-                result.push(tok);
+            if let Some((tok, span)) = self.try_parse_axis_spanned() {
+                result.push((tok, span));
                 continue;
             }
-            if let Some(tok) = self.try_parse_word_or_letter() {
-                result.push(tok);
+            if let Some((tok, span)) = self.try_parse_word_or_letter_spanned() {
+                result.push((tok, span));
                 continue;
             }
 
             // Ничего не распознано — продвигаемся на один токен
-            if let Some((RawToken::Number(n), _)) = self.advance() {
-                result.push(Token::Number(n));
+            if let Some((RawToken::Number(n), span)) = self.advance() {
+                result.push((Token::Number(n), span));
             }
         }
 
@@ -172,22 +187,32 @@ impl<'a> Parser<'a> {
     // ── Парсинг комментария ─────────────────────────────────────────
 
     fn parse_comment(&mut self) -> Token {
+        let (t, _) = self.parse_comment_spanned(Span { start: 0, end: 0 });
+        t
+    }
+
+    fn parse_comment_spanned(&mut self, fallback_span: Span) -> (Token, Span) {
         match self.advance() {
-            Some((RawToken::Comment(text), _)) => Token::Comment(text.to_string()),
-            _ => Token::Comment(String::new()),
+            Some((RawToken::Comment(text), span)) => (Token::Comment(text.to_string()), span),
+            _ => (Token::Comment(String::new()), fallback_span),
         }
     }
 
     // ── G-код ───────────────────────────────────────────────────────
 
     fn try_parse_gcode(&mut self) -> Option<Token> {
+        self.try_parse_gcode_spanned().map(|(t, _)| t)
+    }
+
+    fn try_parse_gcode_spanned(&mut self) -> Option<(Token, Span)> {
         let save = self.pos;
-        match self.current() {
-            Some((RawToken::Letter('G') | RawToken::Letter('g'), _)) => {
+        let span = match self.current() {
+            Some((RawToken::Letter('G') | RawToken::Letter('g'), s)) => {
                 self.advance();
+                s
             }
             _ => return None,
-        }
+        };
 
         // После G должно быть число (может с минусом)
         let num = match self.parse_signed_number() {
@@ -197,19 +222,24 @@ impl<'a> Parser<'a> {
                 return None;
             }
         };
-        Some(Token::GCode(num as i32))
+        Some((Token::GCode(num as i32), span))
     }
 
     // ── M-код ───────────────────────────────────────────────────────
 
     fn try_parse_mcode(&mut self) -> Option<Token> {
+        self.try_parse_mcode_spanned().map(|(t, _)| t)
+    }
+
+    fn try_parse_mcode_spanned(&mut self) -> Option<(Token, Span)> {
         let save = self.pos;
-        match self.current() {
-            Some((RawToken::Letter('M') | RawToken::Letter('m'), _)) => {
+        let span = match self.current() {
+            Some((RawToken::Letter('M') | RawToken::Letter('m'), s)) => {
                 self.advance();
+                s
             }
             _ => return None,
-        }
+        };
 
         let num = match self.parse_signed_number() {
             Some(n) => n,
@@ -218,19 +248,24 @@ impl<'a> Parser<'a> {
                 return None;
             }
         };
-        Some(Token::MCode(num as i32))
+        Some((Token::MCode(num as i32), span))
     }
 
     // ── N-код (номер кадра) ─────────────────────────────────────────
 
     fn try_parse_ncode(&mut self) -> Option<Token> {
+        self.try_parse_ncode_spanned().map(|(t, _)| t)
+    }
+
+    fn try_parse_ncode_spanned(&mut self) -> Option<(Token, Span)> {
         let save = self.pos;
-        match self.current() {
-            Some((RawToken::Letter('N') | RawToken::Letter('n'), _)) => {
+        let span = match self.current() {
+            Some((RawToken::Letter('N') | RawToken::Letter('n'), s)) => {
                 self.advance();
+                s
             }
             _ => return None,
-        }
+        };
 
         let num = match self.parse_number_only() {
             Some(n) => n,
@@ -239,21 +274,25 @@ impl<'a> Parser<'a> {
                 return None;
             }
         };
-        Some(Token::NCode(num as i32))
+        Some((Token::NCode(num as i32), span))
     }
 
     // ── Speed (скорость шпинделя S или подача F) ──────────────────
 
     fn try_parse_speed(&mut self) -> Option<Token> {
+        self.try_parse_speed_spanned().map(|(t, _)| t)
+    }
+
+    fn try_parse_speed_spanned(&mut self) -> Option<(Token, Span)> {
         let save = self.pos;
-        let prefix = match self.current() {
-            Some((RawToken::Letter('S') | RawToken::Letter('s'), _)) => {
+        let (prefix, span) = match self.current() {
+            Some((RawToken::Letter('S') | RawToken::Letter('s'), s)) => {
                 self.advance();
-                'S'
+                ('S', s)
             }
-            Some((RawToken::Letter('F') | RawToken::Letter('f'), _)) => {
+            Some((RawToken::Letter('F') | RawToken::Letter('f'), s)) => {
                 self.advance();
-                'F'
+                ('F', s)
             }
             _ => return None,
         };
@@ -290,16 +329,21 @@ impl<'a> Parser<'a> {
             }
         }
 
-        Some(Token::Speed(raw))
+        Some((Token::Speed(raw), span))
     }
 
     // ── R-параметр ─────────────────────────────────────────────────
 
     fn try_parse_r_parameter(&mut self) -> Option<Token> {
+        self.try_parse_r_parameter_spanned().map(|(t, _)| t)
+    }
+
+    fn try_parse_r_parameter_spanned(&mut self) -> Option<(Token, Span)> {
         let save = self.pos;
-        match self.current() {
-            Some((RawToken::Letter('R') | RawToken::Letter('r'), _)) => {
+        let span = match self.current() {
+            Some((RawToken::Letter('R') | RawToken::Letter('r'), s)) => {
                 self.advance();
+                s
             }
             _ => return None,
         };
@@ -325,7 +369,7 @@ impl<'a> Parser<'a> {
                     raw.push_str(&self.collect_expression());
                 }
 
-                Some(Token::RParameter(raw))
+                Some((Token::RParameter(raw), span))
             }
             _ => {
                 // R без цифр — это не R-параметр, а слово
@@ -338,8 +382,12 @@ impl<'a> Parser<'a> {
     // ── Ось ─────────────────────────────────────────────────────────
 
     fn try_parse_axis(&mut self) -> Option<Token> {
-        let letter = match self.current() {
-            Some((RawToken::Letter(l), _)) if AXIS_LETTERS.contains(&l.to_ascii_uppercase()) => {
+        self.try_parse_axis_spanned().map(|(t, _)| t)
+    }
+
+    fn try_parse_axis_spanned(&mut self) -> Option<(Token, Span)> {
+        let (letter, span) = match self.current() {
+            Some((RawToken::Letter(l), s)) if AXIS_LETTERS.contains(&l.to_ascii_uppercase()) => {
                 let l = l.to_ascii_uppercase();
                 // Проверяем, что следующая буква НЕ часть слова
                 // (чтобы не спутать W в WHILE с осью W)
@@ -347,7 +395,7 @@ impl<'a> Parser<'a> {
                     return None;
                 }
                 self.advance();
-                l
+                (l, s)
             }
             _ => return None,
         };
@@ -360,12 +408,15 @@ impl<'a> Parser<'a> {
                 // Выражение: читаем всё до конца блока
                 let expr_span = self.collect_expression_span();
                 let expr = self.slice(&expr_span).trim().to_string();
-                Some(Token::AxisExpr(format!("{}", letter), expr))
+                Some((Token::AxisExpr(format!("{}", letter), expr), span))
             }
             // X-10.5, X10, X — ось с числом или без
             _ => {
                 let (value, decimal_places) = self.parse_axis_value();
-                Some(Token::Axis(format!("{}", letter), value, decimal_places))
+                Some((
+                    Token::Axis(format!("{}", letter), value, decimal_places),
+                    span,
+                ))
             }
         }
     }
@@ -404,14 +455,18 @@ impl<'a> Parser<'a> {
     // ── Слово / буква (многосимвольные слова, ключевые слова потока) ──
 
     fn try_parse_word_or_letter(&mut self) -> Option<Token> {
+        self.try_parse_word_or_letter_spanned().map(|(t, _)| t)
+    }
+
+    fn try_parse_word_or_letter_spanned(&mut self) -> Option<(Token, Span)> {
         let save = self.pos;
 
         // Особый случай: скобочное выражение без слова перед ним
         // (Rapid move) — это тоже Word
-        if let Some((RawToken::ParenOpen, _)) = self.current() {
+        if let Some((RawToken::ParenOpen, span)) = self.current() {
             self.advance(); // продвигаем открывающую скобку
             let args = self.collect_paren_args();
-            return Some(Token::Word(format!("({})", args)));
+            return Some((Token::Word(format!("({})", args)), span));
         }
 
         // Должна быть буква для обычного слова
@@ -421,6 +476,10 @@ impl<'a> Parser<'a> {
         }
 
         // Собираем слово
+        let word_span = match self.current() {
+            Some((_, s)) => s,
+            _ => return None,
+        };
         let word = self.collect_word();
 
         if word.is_empty() {
@@ -430,22 +489,24 @@ impl<'a> Parser<'a> {
         // Проверяем по словарю
         if self.dictionary.is_flow_control(&word) {
             // Ключевое слово потока: захватываем всё до конца строки
-            let word_span = self.find_word_span(save);
-            let full_text = self.slice(&word_span).trim().to_string();
+            let full_span = self.find_word_span(save);
+            let full_text = self.slice(&full_span).trim().to_string();
             self.skip_to_end_of_line();
-            return Some(Token::Word(full_text));
+            return Some((Token::Word(full_text), full_span));
         }
 
         if self.dictionary.is_system_command(&word) || self.dictionary.is_miscellaneous(&word) {
             // Системная команда или вспомогательное слово:
             // парсится как обычное слово со скобочными аргументами
             // (не захватывает всю строку)
-            return self.finish_word(word);
+            let token = self.finish_word(word)?;
+            return Some((token, word_span));
         }
 
         // Обычное слово: может иметь скобочные аргументы,
         // или = выражение (R100=5 после пробелов)
-        self.finish_word(word)
+        let token = self.finish_word(word)?;
+        Some((token, word_span))
     }
 
     /// Завершает парсинг обычного слова: проверяет скобки или = выражение.

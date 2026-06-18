@@ -76,16 +76,14 @@ pub fn tokenize_with_positions(input: &str) -> Vec<TokenWithPosition> {
     let dict = KeywordDictionary::siemens();
 
     let mut parser = Parser::new(raw_tokens, &dict, input);
-    let tokens = parser.parse_program();
+    let tokens = parser.parse_program_spanned();
 
-    // Позиции парсер не возвращает — временно ставим (0, 0).
-    // TODO: сохранять позиции из Span при парсинге.
     tokens
         .into_iter()
-        .map(|t| TokenWithPosition {
-            token: t,
-            start: 0,
-            end: 0,
+        .map(|(token, span)| TokenWithPosition {
+            token,
+            start: span.start,
+            end: span.end,
         })
         .collect()
 }
