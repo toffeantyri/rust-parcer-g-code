@@ -206,7 +206,7 @@ impl<'a> Parser<'a> {
 
     fn try_parse_gcode_spanned(&mut self) -> Option<(Token, Span)> {
         let save = self.pos;
-        let span = match self.current() {
+        let mut span = match self.current() {
             Some((RawToken::Letter('G') | RawToken::Letter('g'), s)) => {
                 self.advance();
                 s
@@ -215,14 +215,16 @@ impl<'a> Parser<'a> {
         };
 
         // После G должно быть число (может с минусом)
-        let num = match self.parse_signed_number() {
-            Some(n) => n,
+        match self.parse_signed_number_spanned() {
+            Some((num, num_span)) => {
+                span.end = num_span.end;
+                Some((Token::GCode(num as i32), span))
+            }
             None => {
                 self.pos = save;
-                return None;
+                None
             }
-        };
-        Some((Token::GCode(num as i32), span))
+        }
     }
 
     // ── M-код ───────────────────────────────────────────────────────
@@ -233,7 +235,7 @@ impl<'a> Parser<'a> {
 
     fn try_parse_mcode_spanned(&mut self) -> Option<(Token, Span)> {
         let save = self.pos;
-        let span = match self.current() {
+        let mut span = match self.current() {
             Some((RawToken::Letter('M') | RawToken::Letter('m'), s)) => {
                 self.advance();
                 s
@@ -241,13 +243,14 @@ impl<'a> Parser<'a> {
             _ => return None,
         };
 
-        let num = match self.parse_signed_number() {
-            Some(n) => n,
+        let (num, num_span) = match self.parse_signed_number_spanned() {
+            Some((n, s)) => (n, s),
             None => {
                 self.pos = save;
                 return None;
             }
         };
+        span.end = num_span.end;
         Some((Token::MCode(num as i32), span))
     }
 
@@ -259,7 +262,7 @@ impl<'a> Parser<'a> {
 
     fn try_parse_ncode_spanned(&mut self) -> Option<(Token, Span)> {
         let save = self.pos;
-        let span = match self.current() {
+        let mut span = match self.current() {
             Some((RawToken::Letter('N') | RawToken::Letter('n'), s)) => {
                 self.advance();
                 s
@@ -267,13 +270,14 @@ impl<'a> Parser<'a> {
             _ => return None,
         };
 
-        let num = match self.parse_number_only() {
-            Some(n) => n,
+        let (num, num_span) = match self.parse_number_only_spanned() {
+            Some((n, s)) => (n, s),
             None => {
                 self.pos = save;
                 return None;
             }
         };
+        span.end = num_span.end;
         Some((Token::NCode(num as i32), span))
     }
 
@@ -285,7 +289,7 @@ impl<'a> Parser<'a> {
 
     fn try_parse_speed_spanned(&mut self) -> Option<(Token, Span)> {
         let save = self.pos;
-        let (prefix, span) = match self.current() {
+        let (prefix, mut span) = match self.current() {
             Some((RawToken::Letter('S') | RawToken::Letter('s'), s)) => {
                 self.advance();
                 ('S', s)
@@ -303,28 +307,32 @@ impl<'a> Parser<'a> {
 
         // Для S: может быть вторая S (SS...)
         if prefix == 'S' {
-            if let Some((RawToken::Letter('S'), _)) = self.current() {
+            if let Some((RawToken::Letter('S'), s)) = self.current() {
                 self.advance();
+                span.end = s.end;
                 raw.push('S');
             }
         }
 
         // Собираем число
-        let num = match self.parse_signed_number() {
-            Some(n) => n,
+        let (num, num_span) = match self.parse_signed_number_spanned() {
+            Some((n, s)) => (n, s),
             None => {
                 self.pos = save;
                 return None;
             }
         };
+        span.end = num_span.end;
         raw.push_str(&format_number(num));
 
         // Если встретили `=`, читаем значение ступени (только для S)
         if prefix == 'S' {
-            if let Some((RawToken::Equals, _)) = self.current() {
+            if let Some((RawToken::Equals, s)) = self.current() {
                 self.advance();
+                span.end = s.end;
                 raw.push('=');
-                let step_val = self.parse_signed_number()?;
+                let (step_val, step_span) = self.parse_signed_number_spanned()?;
+                span.end = step_span.end;
                 raw.push_str(&format_number(step_val));
             }
         }
@@ -340,7 +348,7 @@ impl<'a> Parser<'a> {
 
     fn try_parse_r_parameter_spanned(&mut self) -> Option<(Token, Span)> {
         let save = self.pos;
-        let span = match self.current() {
+        let mut span = match self.current() {
             Some((RawToken::Letter('R') | RawToken::Letter('r'), s)) => {
                 self.advance();
                 s
@@ -352,21 +360,29 @@ impl<'a> Parser<'a> {
         // Пробел между R и числом допускается (R 100 = 5)
         // — это стандартный Siemens-формат R-параметра.
         match self.current() {
-            Some((RawToken::Number(n), _)) => {
+            Some((RawToken::Number(n), num_span)) => {
                 let n_int = n as i32;
                 if n_int as f64 != n || n_int <= 0 {
                     self.pos = save;
                     return None;
                 }
                 self.advance();
+                span.end = num_span.end;
                 let mut raw = format!("R{}", n_int);
 
                 // Может быть = выражение
-                if let Some((RawToken::Equals, _)) = self.current() {
+                if let Some((RawToken::Equals, eq_span)) = self.current() {
                     self.advance();
+                    span.end = eq_span.end;
                     raw.push('=');
                     // Читаем выражение до конца строки или до ;
-                    raw.push_str(&self.collect_expression());
+                    let expr = self.collect_expression();
+                    span.end = self
+                        .tokens
+                        .get(self.pos.saturating_sub(1))
+                        .map(|t| t.1.end)
+                        .unwrap_or(span.end);
+                    raw.push_str(&expr);
                 }
 
                 Some((Token::RParameter(raw), span))
@@ -386,7 +402,7 @@ impl<'a> Parser<'a> {
     }
 
     fn try_parse_axis_spanned(&mut self) -> Option<(Token, Span)> {
-        let (letter, span) = match self.current() {
+        let (letter, mut span) = match self.current() {
             Some((RawToken::Letter(l), s)) if AXIS_LETTERS.contains(&l.to_ascii_uppercase()) => {
                 let l = l.to_ascii_uppercase();
                 // Проверяем, что следующая буква НЕ часть слова
@@ -403,16 +419,21 @@ impl<'a> Parser<'a> {
         // Следующий токен определяет тип: ось с числом, ось с выражением, или просто ось
         match self.current() {
             // X = 160+10 — AxisExpr
-            Some((RawToken::Equals, _)) => {
+            Some((RawToken::Equals, eq_span)) => {
                 self.advance();
+                span.end = eq_span.end;
                 // Выражение: читаем всё до конца блока
                 let expr_span = self.collect_expression_span();
+                span.end = expr_span.end;
                 let expr = self.slice(&expr_span).trim().to_string();
                 Some((Token::AxisExpr(format!("{}", letter), expr), span))
             }
             // X-10.5, X10, X — ось с числом или без
             _ => {
-                let (value, decimal_places) = self.parse_axis_value();
+                let (value, decimal_places, value_span) = self.parse_axis_value_spanned();
+                if let Some(vs) = value_span {
+                    span.end = vs.end;
+                }
                 Some((
                     Token::Axis(format!("{}", letter), value, decimal_places),
                     span,
@@ -423,6 +444,13 @@ impl<'a> Parser<'a> {
 
     /// Собирает ось со значением: `X10.5`, `X-10.5`, `X` (без значения).
     fn parse_axis_value(&mut self) -> (Option<f64>, Option<usize>) {
+        let (val, dec, _) = self.parse_axis_value_spanned();
+        (val, dec)
+    }
+
+    /// Собирает ось со значением с возвратом Span.
+    fn parse_axis_value_spanned(&mut self) -> (Option<f64>, Option<usize>, Option<Span>) {
+        let start = self.tokens.get(self.pos).map(|t| t.1.start);
         // Может быть минус
         let neg = if let Some((RawToken::Minus, _)) = self.current() {
             self.advance();
@@ -435,18 +463,22 @@ impl<'a> Parser<'a> {
             Some((RawToken::Number(val), span)) => {
                 let dec = count_decimal_places(self.slice(&span));
                 self.advance();
+                let value_span = Span {
+                    start: start.unwrap_or(span.start),
+                    end: span.end,
+                };
                 if neg {
-                    (Some(-val), dec)
+                    (Some(-val), dec, Some(value_span))
                 } else {
-                    (Some(val), dec)
+                    (Some(val), dec, Some(value_span))
                 }
             }
             _ => {
                 if neg {
                     // Был минус без числа — невалидно
-                    (None, None)
+                    (None, None, None)
                 } else {
-                    (None, None)
+                    (None, None, None)
                 }
             }
         }
@@ -466,7 +498,11 @@ impl<'a> Parser<'a> {
         if let Some((RawToken::ParenOpen, span)) = self.current() {
             self.advance(); // продвигаем открывающую скобку
             let args = self.collect_paren_args();
-            return Some((Token::Word(format!("({})", args)), span));
+            let mut result_span = span;
+            if let Some(last) = self.tokens.get(self.pos.saturating_sub(1)) {
+                result_span.end = last.1.end;
+            }
+            return Some((Token::Word(format!("({})", args)), result_span));
         }
 
         // Должна быть буква для обычного слова
@@ -475,15 +511,21 @@ impl<'a> Parser<'a> {
             _ => return None,
         }
 
-        // Собираем слово
-        let word_span = match self.current() {
+        // Собираем слово — начальная буква
+        let word_start_span = match self.current() {
             Some((_, s)) => s,
             _ => return None,
         };
+        let mut span = word_start_span;
         let word = self.collect_word();
 
         if word.is_empty() {
             return None;
+        }
+
+        // Расширяем span на все буквы слова
+        if let Some(last) = self.tokens.get(self.pos.saturating_sub(1)) {
+            span.end = last.1.end;
         }
 
         // Проверяем по словарю
@@ -499,31 +541,52 @@ impl<'a> Parser<'a> {
             // Системная команда или вспомогательное слово:
             // парсится как обычное слово со скобочными аргументами
             // (не захватывает всю строку)
-            let token = self.finish_word(word)?;
-            return Some((token, word_span));
+            let (token, finish_span) = self.finish_word_spanned(word)?;
+            span.end = finish_span.end;
+            return Some((token, span));
         }
 
         // Обычное слово: может иметь скобочные аргументы,
         // или = выражение (R100=5 после пробелов)
-        let token = self.finish_word(word)?;
-        Some((token, word_span))
+        let (token, finish_span) = self.finish_word_spanned(word)?;
+        span.end = finish_span.end;
+        Some((token, span))
     }
 
     /// Завершает парсинг обычного слова: проверяет скобки или = выражение.
     fn finish_word(&mut self, word: String) -> Option<Token> {
+        self.finish_word_spanned(word).map(|(t, _)| t)
+    }
+
+    /// Завершает парсинг обычного слова с возвратом Span последнего потреблённого токена.
+    fn finish_word_spanned(&mut self, word: String) -> Option<(Token, Span)> {
         // Обычное слово: может иметь скобочные аргументы,
         // или = выражение
         if let Some((RawToken::ParenOpen, _)) = self.current() {
             self.advance();
             let args = self.collect_paren_args();
-            Some(Token::Word(format!("{}({})", word, args)))
-        } else if let Some((RawToken::Equals, _)) = self.current() {
+            let finish_span = self
+                .tokens
+                .get(self.pos.saturating_sub(1))
+                .map(|t| t.1)
+                .unwrap_or(Span { start: 0, end: 0 });
+            Some((Token::Word(format!("{}({})", word, args)), finish_span))
+        } else if let Some((RawToken::Equals, eq_span)) = self.current() {
             self.advance();
             let expr_span = self.collect_expression_span();
+            let finish_span = Span {
+                start: eq_span.start,
+                end: expr_span.end,
+            };
             let expr = self.slice(&expr_span).trim().to_string();
-            Some(Token::Word(format!("{}={}", word, expr)))
+            Some((Token::Word(format!("{}={}", word, expr)), finish_span))
         } else {
-            Some(Token::Word(word))
+            let finish_span = self
+                .tokens
+                .get(self.pos.saturating_sub(1))
+                .map(|t| t.1)
+                .unwrap_or(Span { start: 0, end: 0 });
+            Some((Token::Word(word), finish_span))
         }
     }
 
@@ -693,6 +756,12 @@ impl<'a> Parser<'a> {
 
     /// Парсит число со знаком (опциональный минус + Number).
     fn parse_signed_number(&mut self) -> Option<f64> {
+        self.parse_signed_number_spanned().map(|(n, _)| n)
+    }
+
+    /// Парсит число со знаком (опциональный минус + Number) с возвратом Span.
+    fn parse_signed_number_spanned(&mut self) -> Option<(f64, Span)> {
+        let start = self.tokens.get(self.pos).map(|t| t.1.start);
         let neg = if let Some((RawToken::Minus, _)) = self.current() {
             self.advance();
             true
@@ -701,12 +770,14 @@ impl<'a> Parser<'a> {
         };
 
         match self.advance() {
-            Some((RawToken::Number(n), _)) => {
-                if neg {
-                    Some(-n)
-                } else {
-                    Some(n)
-                }
+            Some((RawToken::Number(n), span)) => {
+                let val = if neg { -n } else { n };
+                // Span от начала числа (или минуса) до конца числа
+                let span = Span {
+                    start: start.unwrap_or(span.start),
+                    end: span.end,
+                };
+                Some((val, span))
             }
             _ => None,
         }
@@ -714,8 +785,13 @@ impl<'a> Parser<'a> {
 
     /// Парсит только положительное число (без знака).
     fn parse_number_only(&mut self) -> Option<f64> {
+        self.parse_number_only_spanned().map(|(n, _)| n)
+    }
+
+    /// Парсит только положительное число (без знака) с возвратом Span.
+    fn parse_number_only_spanned(&mut self) -> Option<(f64, Span)> {
         match self.advance() {
-            Some((RawToken::Number(n), _)) => Some(n),
+            Some((RawToken::Number(n), span)) => Some((n, span)),
             _ => None,
         }
     }
