@@ -22,6 +22,32 @@ pub enum Token {
     Number(f64),
     /// Комментарий после `;`
     Comment(String),
+    /// Управляющие конструкции потока
+    /// WhileBlock { condition: String } — условие цикла
+    /// Открывается EndWhile
+    WhileBlock(String),
+    /// EndWhile — закрывает While (без условия)
+    EndWhile,
+    /// IfBlock { condition: String } — условие в if
+    /// Открывается EndIf
+    IfBlock(String),
+    /// Else — ветка else внутри if (без условия)
+    Else,
+    /// EndIf — закрывает if (без условия)
+    EndIf,
+    /// Repeat — начало цикла с пост-условием,
+    /// закрывается Until
+    Repeat,
+    /// Until { condition: String } — закрывает Repeat
+    Until(String),
+    /// For — начало цикла со счётчиком
+    For(String),
+    /// EndFor — закрывает For
+    EndFor,
+    /// Loop — начало бесконечного цикла
+    LoopBlock(String),
+    /// EndLoop — закрывает Loop
+    EndLoop,
     Eof,
     NewLine,
     Unknown(char),

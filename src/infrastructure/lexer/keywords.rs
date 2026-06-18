@@ -32,7 +32,8 @@ impl KeywordDictionary {
         let mut dict = Self::new();
         dict.flow_control.extend(
             [
-                "WHILE", "IF", "ELSE", "ENDIF", "ENDWHILE", "REPEAT", "UNTIL",
+                "WHILE", "IF", "ELSE", "ENDIF", "ENDWHILE", "REPEAT", "UNTIL", "FOR", "ENDFOR",
+                "LOOP", "ENDLOOP",
             ]
             .iter()
             .map(|&s| s.to_string()),

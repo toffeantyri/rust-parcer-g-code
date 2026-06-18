@@ -63,6 +63,18 @@ impl Parser {
                 let w = word.clone();
                 self.parse_word(&w)
             }
+            // Управляющие конструкции потока
+            Token::WhileBlock(cond) => self.parse_while_block_from_token(cond.clone()),
+            Token::EndWhile => Ok(Some(Statement::Word("ENDWHILE".to_string()))),
+            Token::IfBlock(cond) => self.parse_if_block_from_token(cond.clone()),
+            Token::Else => Ok(Some(Statement::Word("ELSE".to_string()))),
+            Token::EndIf => Ok(Some(Statement::Word("ENDIF".to_string()))),
+            Token::Repeat => Ok(Some(Statement::Word("REPEAT".to_string()))),
+            Token::Until(cond) => Ok(Some(Statement::Word(format!("UNTIL {}", cond)))),
+            Token::For(cond) => Ok(Some(Statement::Word(format!("FOR {}", cond)))),
+            Token::EndFor => Ok(Some(Statement::Word("ENDFOR".to_string()))),
+            Token::LoopBlock(cond) => Ok(Some(Statement::Word(format!("LOOP {}", cond)))),
+            Token::EndLoop => Ok(Some(Statement::Word("ENDLOOP".to_string()))),
             Token::Eof => Ok(None),
             _ => {
                 let raw = self.token_to_string(token);
@@ -85,13 +97,43 @@ impl Parser {
         Ok(Some(Statement::Word(word.to_string())))
     }
 
+    /// Парсит while-блок, когда условие уже извлечено из токена.
+    fn parse_while_block_from_token(
+        &mut self,
+        condition: String,
+    ) -> Result<Option<Statement>, ParseError> {
+        self.parse_while_block_body(condition)
+    }
+
+    /// Парсит if-блок, когда условие уже извлечено из токена.
+    fn parse_if_block_from_token(
+        &mut self,
+        condition: String,
+    ) -> Result<Option<Statement>, ParseError> {
+        // Собираем слово "IF <condition>" и передаём в parse_if_block
+        let word = if condition.is_empty() {
+            "IF".to_string()
+        } else {
+            format!("IF {}", condition)
+        };
+        self.parse_if_block(&word)
+    }
+
     fn parse_while_block(&mut self, word: &str) -> Result<Option<Statement>, ParseError> {
         let condition = if word.len() > 6 {
             word[6..].to_string()
         } else {
             String::new()
         };
+        self.parse_while_block_body(condition)
+    }
 
+    /// Парсит тело while-блока (внутренний цикл), начиная с текущей позиции.
+    /// Возвращает WhileBlock, когда доходит до EndWhile на нулевой глубине.
+    fn parse_while_block_body(
+        &mut self,
+        condition: String,
+    ) -> Result<Option<Statement>, ParseError> {
         let mut body = Vec::new();
         let mut depth = 1u32;
 
@@ -112,9 +154,6 @@ impl Parser {
                         }
                         body.push(Statement::Word(w.clone()));
                     } else if up.starts_with("WHILE") {
-                        // Вложенный WHILE — парсим рекурсивно
-                        // depth не увеличиваем: рекурсивный вызов сам обработает
-                        // свой ENDWHILE, а внешний ENDWHILE закроет внешний цикл.
                         let inner = self.parse_while_block_inline(w)?;
                         body.push(inner);
                     } else if up.starts_with("IF") {
@@ -144,6 +183,33 @@ impl Parser {
                 Token::Comment(text) => {
                     body.push(Statement::Comment(CommentStatement { text: text.clone() }))
                 }
+                // Новые токены
+                Token::WhileBlock(inner_cond) => {
+                    let inner = self.parse_while_block_from_token(inner_cond.clone())?;
+                    if let Some(stmt) = inner {
+                        body.push(stmt);
+                    }
+                }
+                Token::EndWhile => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Ok(Some(Statement::WhileBlock(WhileStatement {
+                            condition,
+                            body,
+                        })));
+                    }
+                    body.push(Statement::Word("ENDWHILE".to_string()));
+                }
+                Token::IfBlock(cond) => {
+                    let inner = self.parse_if_block_from_token(cond.clone())?;
+                    if let Some(stmt) = inner {
+                        body.push(stmt);
+                    }
+                }
+                Token::EndIf => body.push(Statement::Word("ENDIF".to_string())),
+                Token::Else => body.push(Statement::Word("ELSE".to_string())),
+                Token::EndFor => body.push(Statement::Word("ENDFOR".to_string())),
+                Token::EndLoop => body.push(Statement::Word("ENDLOOP".to_string())),
                 Token::Eof => {
                     return Err(ParseError {
                         message: "WHILE без ENDWHILE".into(),
@@ -169,7 +235,14 @@ impl Parser {
         } else {
             String::new()
         };
+        self.parse_while_block_body_inline(condition)
+    }
 
+    /// Парсит тело while-блока (вложенный вызов), возвращая Statement напрямую.
+    fn parse_while_block_body_inline(
+        &mut self,
+        condition: String,
+    ) -> Result<Statement, ParseError> {
         let mut body = Vec::new();
         let mut depth = 1u32;
 
@@ -190,6 +263,7 @@ impl Parser {
                         // Вложенный WHILE — парсим рекурсивно
                         // depth не увеличиваем: рекурсивный вызов сам обработает
                         // свой ENDWHILE, а внешний ENDWHILE закроет внешний цикл.
+                        // Примечание: это срабатывает только если WHILE пришёл как Word.
                         let inner = self.parse_while_block_inline(w)?;
                         body.push(inner);
                     } else if up.starts_with("IF") {
@@ -219,6 +293,30 @@ impl Parser {
                 Token::Comment(text) => {
                     body.push(Statement::Comment(CommentStatement { text: text.clone() }))
                 }
+                // Новые токены
+                Token::WhileBlock(inner_cond) => {
+                    let inner = self.parse_while_block_from_token(inner_cond.clone())?;
+                    if let Some(stmt) = inner {
+                        body.push(stmt);
+                    }
+                }
+                Token::EndWhile => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Ok(Statement::WhileBlock(WhileStatement { condition, body }));
+                    }
+                    body.push(Statement::Word("ENDWHILE".to_string()));
+                }
+                Token::IfBlock(cond) => {
+                    let inner = self.parse_if_block_from_token(cond.clone())?;
+                    if let Some(stmt) = inner {
+                        body.push(stmt);
+                    }
+                }
+                Token::EndIf => body.push(Statement::Word("ENDIF".to_string())),
+                Token::Else => body.push(Statement::Word("ELSE".to_string())),
+                Token::EndFor => body.push(Statement::Word("ENDFOR".to_string())),
+                Token::EndLoop => body.push(Statement::Word("ENDLOOP".to_string())),
                 Token::Eof => {
                     return Err(ParseError {
                         message: "WHILE без ENDWHILE".into(),
@@ -240,7 +338,7 @@ impl Parser {
 
     fn parse_if_block(&mut self, word: &str) -> Result<Option<Statement>, ParseError> {
         let condition = if word.len() > 3 {
-            word[3..].to_string()
+            word[3..].trim().to_string()
         } else {
             String::new()
         };
@@ -344,6 +442,65 @@ impl Parser {
                     in_else,
                     Statement::Comment(CommentStatement { text: text.clone() }),
                 ),
+                // Новые токены
+                Token::WhileBlock(inner_cond) => {
+                    let inner = self.parse_while_block_from_token(inner_cond.clone())?;
+                    if let Some(stmt) = inner {
+                        push_to(&mut then_body, &mut else_body, in_else, stmt);
+                    }
+                }
+                Token::EndWhile => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::Word("ENDWHILE".to_string()),
+                ),
+                Token::IfBlock(cond) => {
+                    let inner = self.parse_if_block_from_token(cond.clone())?;
+                    if let Some(stmt) = inner {
+                        push_to(&mut then_body, &mut else_body, in_else, stmt);
+                    }
+                }
+                Token::EndIf => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Ok(Some(Statement::IfBlock(IfStatement {
+                            condition,
+                            then_body,
+                            else_body,
+                        })));
+                    }
+                    push_to(
+                        &mut then_body,
+                        &mut else_body,
+                        in_else,
+                        Statement::Word("ENDIF".to_string()),
+                    );
+                }
+                Token::Else => {
+                    if depth == 1 {
+                        in_else = true;
+                    } else {
+                        push_to(
+                            &mut then_body,
+                            &mut else_body,
+                            in_else,
+                            Statement::Word("ELSE".to_string()),
+                        );
+                    }
+                }
+                Token::EndFor => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::Word("ENDFOR".to_string()),
+                ),
+                Token::EndLoop => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::Word("ENDLOOP".to_string()),
+                ),
                 Token::Eof => {
                     return Err(ParseError {
                         message: "IF без ENDIF".into(),
@@ -365,7 +522,7 @@ impl Parser {
 
     fn parse_if_block_inline(&mut self, word: &str) -> Result<Statement, ParseError> {
         let condition = if word.len() > 3 {
-            word[3..].to_string()
+            word[3..].trim().to_string()
         } else {
             String::new()
         };
@@ -469,6 +626,65 @@ impl Parser {
                     in_else,
                     Statement::Comment(CommentStatement { text: text.clone() }),
                 ),
+                // Новые токены
+                Token::WhileBlock(inner_cond) => {
+                    let inner = self.parse_while_block_from_token(inner_cond.clone())?;
+                    if let Some(stmt) = inner {
+                        push_to(&mut then_body, &mut else_body, in_else, stmt);
+                    }
+                }
+                Token::EndWhile => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::Word("ENDWHILE".to_string()),
+                ),
+                Token::IfBlock(cond) => {
+                    let inner = self.parse_if_block_from_token(cond.clone())?;
+                    if let Some(stmt) = inner {
+                        push_to(&mut then_body, &mut else_body, in_else, stmt);
+                    }
+                }
+                Token::EndIf => {
+                    depth -= 1;
+                    if depth == 0 {
+                        return Ok(Statement::IfBlock(IfStatement {
+                            condition,
+                            then_body,
+                            else_body,
+                        }));
+                    }
+                    push_to(
+                        &mut then_body,
+                        &mut else_body,
+                        in_else,
+                        Statement::Word("ENDIF".to_string()),
+                    );
+                }
+                Token::Else => {
+                    if depth == 1 {
+                        in_else = true;
+                    } else {
+                        push_to(
+                            &mut then_body,
+                            &mut else_body,
+                            in_else,
+                            Statement::Word("ELSE".to_string()),
+                        );
+                    }
+                }
+                Token::EndFor => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::Word("ENDFOR".to_string()),
+                ),
+                Token::EndLoop => push_to(
+                    &mut then_body,
+                    &mut else_body,
+                    in_else,
+                    Statement::Word("ENDLOOP".to_string()),
+                ),
                 Token::Eof => {
                     return Err(ParseError {
                         message: "IF без ENDIF".into(),
@@ -518,6 +734,17 @@ impl Parser {
             Token::NewLine => "\n".to_string(),
             Token::Unknown(ch) => ch.to_string(),
             Token::Eof => String::new(),
+            Token::WhileBlock(cond) => format!("WHILEBLOCK({})", cond),
+            Token::EndWhile => "ENDWHILE".to_string(),
+            Token::IfBlock(cond) => format!("IFBLOCK({})", cond),
+            Token::Else => "ELSE".to_string(),
+            Token::EndIf => "ENDIF".to_string(),
+            Token::Repeat => "REPEAT".to_string(),
+            Token::Until(cond) => format!("UNTIL {}", cond),
+            Token::For(cond) => format!("FOR {}", cond),
+            Token::EndFor => "ENDFOR".to_string(),
+            Token::LoopBlock(cond) => format!("LOOP {}", cond),
+            Token::EndLoop => "ENDLOOP".to_string(),
         }
     }
 }

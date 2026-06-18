@@ -107,6 +107,17 @@ fn main() {
             Token::Number(n) => line.push_str(&format!("{n} ")),
             Token::Comment(s) => line.push_str(&format!(";{s}")),
             Token::Unknown(ch) => line.push_str(&format!("?{ch}? ")),
+            Token::WhileBlock(cond) => line.push_str(&format!("[WHILEBLOCK {cond}] ")),
+            Token::EndWhile => line.push_str("[ENDWHILE] "),
+            Token::IfBlock(cond) => line.push_str(&format!("[IFBLOCK {cond}] ")),
+            Token::Else => line.push_str("[ELSE] "),
+            Token::EndIf => line.push_str("[ENDIF] "),
+            Token::Repeat => line.push_str("[REPEAT] "),
+            Token::Until(cond) => line.push_str(&format!("[UNTIL {cond}] ")),
+            Token::For(cond) => line.push_str(&format!("[FOR {cond}] ")),
+            Token::EndFor => line.push_str("[ENDFOR] "),
+            Token::LoopBlock(cond) => line.push_str(&format!("[LOOP {cond}] ")),
+            Token::EndLoop => line.push_str("[ENDLOOP] "),
             Token::Eof => {}
         }
     }
@@ -166,6 +177,17 @@ fn format_token(tok: &Token) -> (String, String) {
         Token::Eof => ("Eof".to_string(), "".to_string()),
         Token::Speed(val) => ("Speed".to_string(), val.clone()),
         Token::RParameter(val) => ("RParameter".to_string(), val.clone()),
+        Token::WhileBlock(cond) => ("WhileBlock".to_string(), cond.clone()),
+        Token::EndWhile => ("EndWhile".to_string(), String::new()),
+        Token::IfBlock(cond) => ("IfBlock".to_string(), cond.clone()),
+        Token::Else => ("Else".to_string(), String::new()),
+        Token::EndIf => ("EndIf".to_string(), String::new()),
+        Token::Repeat => ("Repeat".to_string(), String::new()),
+        Token::Until(cond) => ("Until".to_string(), cond.clone()),
+        Token::For(cond) => ("For".to_string(), cond.clone()),
+        Token::EndFor => ("EndFor".to_string(), String::new()),
+        Token::LoopBlock(cond) => ("LoopBlock".to_string(), cond.clone()),
+        Token::EndLoop => ("EndLoop".to_string(), String::new()),
         Token::Unknown(ch) => ("Unknown".to_string(), format!("'{ch}'")),
     }
 }

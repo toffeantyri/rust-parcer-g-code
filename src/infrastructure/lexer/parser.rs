@@ -552,7 +552,8 @@ impl<'a> Parser<'a> {
             let full_span = self.find_word_span(save);
             let full_text = self.slice(&full_span).trim().to_string();
             self.skip_to_end_of_line();
-            return Some((Token::Word(full_text), full_span));
+            // Возвращаем отдельные токены для flow control
+            return Some((self.flow_control_token(&word, &full_text), full_span));
         }
 
         if self.dictionary.is_system_command(&word) || self.dictionary.is_miscellaneous(&word) {
@@ -605,6 +606,36 @@ impl<'a> Parser<'a> {
                 .map(|t| t.1)
                 .unwrap_or(Span { start: 0, end: 0 });
             Some((Token::Word(word), finish_span))
+        }
+    }
+
+    /// Преобразует ключевое слово потока в соответствующий токен.
+    /// full_text — полный текст от слова до конца строки (включая условие).
+    fn flow_control_token(&self, word: &str, full_text: &str) -> Token {
+        let upper = word.to_uppercase();
+        match upper.as_str() {
+            "WHILE" => Token::WhileBlock(self.extract_condition(full_text, "WHILE")),
+            "ENDWHILE" => Token::EndWhile,
+            "IF" => Token::IfBlock(self.extract_condition(full_text, "IF")),
+            "ELSE" => Token::Else,
+            "ENDIF" => Token::EndIf,
+            "REPEAT" => Token::Repeat,
+            "UNTIL" => Token::Until(self.extract_condition(full_text, "UNTIL")),
+            "FOR" => Token::For(self.extract_condition(full_text, "FOR")),
+            "ENDFOR" => Token::EndFor,
+            "LOOP" => Token::LoopBlock(self.extract_condition(full_text, "LOOP")),
+            "ENDLOOP" => Token::EndLoop,
+            _ => Token::Word(full_text.to_string()),
+        }
+    }
+
+    /// Извлекает условие после ключевого слова (всё после имени команды).
+    fn extract_condition(&self, full_text: &str, keyword: &str) -> String {
+        let trimmed = full_text.trim();
+        if trimmed.len() > keyword.len() {
+            trimmed[keyword.len()..].trim().to_string()
+        } else {
+            String::new()
         }
     }
 
@@ -945,19 +976,19 @@ mod tests {
     #[test]
     fn test_while_keyword() {
         let tokens = tokenize("WHILE (R101 < 10)");
-        assert_eq!(tokens, vec![Token::Word("WHILE (R101 < 10)".to_string())]);
+        assert_eq!(tokens, vec![Token::WhileBlock("(R101 < 10)".to_string())]);
     }
 
     #[test]
     fn test_if_keyword() {
         let tokens = tokenize("IF (R101 == 0)");
-        assert_eq!(tokens, vec![Token::Word("IF (R101 == 0)".to_string())]);
+        assert_eq!(tokens, vec![Token::IfBlock("(R101 == 0)".to_string())]);
     }
 
     #[test]
     fn test_endwhile() {
         let tokens = tokenize("ENDWHILE");
-        assert_eq!(tokens, vec![Token::Word("ENDWHILE".to_string())]);
+        assert_eq!(tokens, vec![Token::EndWhile]);
     }
 
     #[test]
