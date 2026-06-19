@@ -298,7 +298,33 @@ fn swap_in_line(line: &str, axis1: &str, axis2: &str) -> String {
         Some((c, rest)) => (c, Some(rest)),
         None => (line, None),
     };
-    let words: Vec<&str> = code_part.split_whitespace().collect();
+    // Сначала отделяем содержимое в кавычках — оно не меняется
+    let mut result = String::new();
+    let mut remaining = code_part;
+    while let Some(quote_start) = remaining.find('"') {
+        result.push_str(&remaining[..quote_start]);
+        remaining = &remaining[quote_start + 1..];
+        if let Some(quote_end) = remaining.find('"') {
+            // Возвращаем содержимое кавычек как есть
+            let quoted = &remaining[..quote_end];
+            // Применяем swap к тексту перед очередной кавычкой
+            // а содержимое кавычек оставляем
+            remaining = &remaining[quote_end + 1..];
+            // Мы уже обработали текст перед кавычкой выше, теперь
+            // добавляем кавычки и содержимое
+            result.push('"');
+            result.push_str(quoted);
+            result.push('"');
+        } else {
+            // Нет закрывающей кавычки — остаток как есть
+            result.push('"');
+            result.push_str(remaining);
+            remaining = "";
+            break;
+        }
+    }
+    // Обрабатываем остаток (вне кавычек)
+    let words: Vec<&str> = remaining.split_whitespace().collect();
     let mut swapped: Vec<String> = Vec::new();
     for word in &words {
         let w = *word;
@@ -321,7 +347,12 @@ fn swap_in_line(line: &str, axis1: &str, axis2: &str) -> String {
             }
         }
     }
-    let mut result = swapped.join(" ");
+    if !swapped.is_empty() {
+        if !result.is_empty() {
+            result.push(' ');
+        }
+        result.push_str(&swapped.join(" "));
+    }
     if let Some(com) = comment {
         result.push(';');
         result.push_str(com);
@@ -405,8 +436,20 @@ pub(crate) fn invert_axes_by_letter(text: &str, axis_letter: &str) -> String {
     let mut result = String::with_capacity(text.len());
     let mut i = 0;
     let mut in_comment = false;
+    let mut in_quotes = false;
     while i < bytes.len() {
         let ch = bytes[i] as char;
+        if ch == '"' {
+            in_quotes = !in_quotes;
+            result.push(ch);
+            i += 1;
+            continue;
+        }
+        if in_quotes {
+            result.push(ch);
+            i += 1;
+            continue;
+        }
         if ch == ';' {
             in_comment = true;
             result.push(ch);
