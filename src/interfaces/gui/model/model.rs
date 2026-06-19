@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::interfaces::gui::intent::AxisSwapMode;
+
 /// Состояние приложения
 #[derive(Default)]
 pub struct Model {
@@ -44,6 +46,16 @@ pub struct Model {
     search_focus_needed: bool,
     /// Флаг: запросить фокус поля «Найти» в диалоге замены при следующем кадре
     replace_focus_needed: bool,
+    /// Замена осей: открыто ли окно
+    axis_swap_open: bool,
+    /// Замена осей: режим (Swap или Invert)
+    axis_swap_mode: AxisSwapMode,
+    /// Замена осей: первая ось
+    axis_swap_axis1: String,
+    /// Замена осей: вторая ось
+    axis_swap_axis2: String,
+    /// Замена осей: ось для инвертирования (режим Invert)
+    axis_invert_axis: String,
 }
 
 impl Model {
@@ -124,6 +136,21 @@ impl Model {
     }
     pub fn replace_focus_needed(&self) -> bool {
         self.replace_focus_needed
+    }
+    pub fn axis_swap_open(&self) -> bool {
+        self.axis_swap_open
+    }
+    pub fn axis_swap_mode(&self) -> &AxisSwapMode {
+        &self.axis_swap_mode
+    }
+    pub fn axis_swap_axis1(&self) -> &str {
+        &self.axis_swap_axis1
+    }
+    pub fn axis_swap_axis2(&self) -> &str {
+        &self.axis_swap_axis2
+    }
+    pub fn axis_invert_axis(&self) -> &str {
+        &self.axis_invert_axis
     }
 }
 
@@ -208,6 +235,21 @@ impl Model {
     }
     pub fn set_replace_focus_needed(&mut self, v: bool) {
         self.replace_focus_needed = v;
+    }
+    pub fn set_axis_swap_open(&mut self, v: bool) {
+        self.axis_swap_open = v;
+    }
+    pub fn set_axis_swap_mode(&mut self, v: AxisSwapMode) {
+        self.axis_swap_mode = v;
+    }
+    pub fn set_axis_swap_axis1(&mut self, v: String) {
+        self.axis_swap_axis1 = v;
+    }
+    pub fn set_axis_swap_axis2(&mut self, v: String) {
+        self.axis_swap_axis2 = v;
+    }
+    pub fn set_axis_invert_axis(&mut self, v: String) {
+        self.axis_invert_axis = v;
     }
 }
 

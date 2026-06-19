@@ -361,6 +361,7 @@ impl eframe::App for GCodeApp {
         all_intents.extend(view::view_shortcuts(&self.model, ctx));
         all_intents.extend(view::view_search_dialog(&mut self.model, ctx));
         all_intents.extend(view::view_replace_dialog(&mut self.model, ctx));
+        all_intents.extend(view::view_axis_swap_dialog(&mut self.model, ctx));
 
         // 2. Intent — обрабатываем через handle_intent
         for intent in &all_intents {

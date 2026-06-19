@@ -1,5 +1,6 @@
 //! Update — редьюсер: применяет намерения к модели
 
+use crate::interfaces::gui::intent::AxisSwapMode;
 use crate::interfaces::gui::intent::Intent;
 use crate::interfaces::gui::model::{Model, PendingAction};
 use crate::shared::i18n;
@@ -222,6 +223,35 @@ impl Model {
                 self.set_replace_last_find(String::new());
                 self.set_search_status(i18n::locale().replace.replaced.clone());
             }
+            Intent::ToggleAxisSwap => {
+                self.set_axis_swap_open(!self.axis_swap_open());
+            }
+            Intent::SetAxisSwapMode(mode) => {
+                self.set_axis_swap_mode(mode.clone());
+            }
+            Intent::SetSwapAxis1(axis) => {
+                self.set_axis_swap_axis1(axis.clone());
+            }
+            Intent::SetSwapAxis2(axis) => {
+                self.set_axis_swap_axis2(axis.clone());
+            }
+            Intent::SetInvertAxis(axis) => {
+                self.set_axis_invert_axis(axis.clone());
+            }
+            Intent::ApplyAxisSwap => {
+                let content = self.content().to_string();
+                let result = match self.axis_swap_mode() {
+                    AxisSwapMode::Swap => {
+                        swap_axes(&content, self.axis_swap_axis1(), self.axis_swap_axis2())
+                    }
+                    AxisSwapMode::Invert => {
+                        invert_axes_by_letter(&content, self.axis_invert_axis())
+                    }
+                };
+                self.set_content(result);
+                self.set_modified(true);
+                self.set_axis_swap_open(false);
+            }
         }
     }
 
@@ -237,6 +267,224 @@ fn find_all_occurrences(haystack: &str, needle: &str) -> Vec<usize> {
         return Vec::new();
     }
     haystack.match_indices(needle).map(|(pos, _)| pos).collect()
+}
+
+/// Меняет местами две оси в тексте G-кода.
+/// Например, swap Z и X: "G0 X10 Z20" → "G0 Z10 X20"
+pub(crate) fn swap_axes(text: &str, axis1: &str, axis2: &str) -> String {
+    if axis1.len() != 1 || axis2.len() != 1 || axis1 == axis2 {
+        return text.to_string();
+    }
+    // Построчный проход, чтобы не задеть комментарии
+    let mut result = String::with_capacity(text.len());
+    for line in text.lines() {
+        if result.is_empty() {
+            result.push_str(&swap_in_line(line, axis1, axis2));
+        } else {
+            result.push('\n');
+            result.push_str(&swap_in_line(line, axis1, axis2));
+        }
+    }
+    // Сохраняем trailing newline
+    if text.ends_with('\n') {
+        result.push('\n');
+    }
+    result
+}
+
+/// Меняет местами оси в пределах одной строки (до символа комментария).
+fn swap_in_line(line: &str, axis1: &str, axis2: &str) -> String {
+    let (code_part, comment) = match line.split_once(';') {
+        Some((c, rest)) => (c, Some(rest)),
+        None => (line, None),
+    };
+    let words: Vec<&str> = code_part.split_whitespace().collect();
+    let mut swapped: Vec<String> = Vec::new();
+    for word in &words {
+        let w = *word;
+        if let Some((ax, expr)) = split_axis_expr(w) {
+            if ax == axis1 {
+                swapped.push(format!("{axis2}={expr}"));
+            } else if ax == axis2 {
+                swapped.push(format!("{axis1}={expr}"));
+            } else {
+                swapped.push(w.to_string());
+            }
+        } else {
+            let (prefix, value) = split_axis_value(w);
+            if prefix == axis1 {
+                swapped.push(format!("{axis2}{value}"));
+            } else if prefix == axis2 {
+                swapped.push(format!("{axis1}{value}"));
+            } else {
+                swapped.push(w.to_string());
+            }
+        }
+    }
+    let mut result = swapped.join(" ");
+    if let Some(com) = comment {
+        result.push(';');
+        result.push_str(com);
+    }
+    result
+}
+
+/// Выделяет букву оси и значение из токена вида "X10.5" или "Z-20".
+fn split_axis_value(word: &str) -> (&str, &str) {
+    let axis_letters = ['X', 'Y', 'Z', 'A', 'B', 'C', 'U', 'V', 'W'];
+    let mut chars = word.char_indices();
+    let Some((_, first_char)) = chars.next() else {
+        return (word, "");
+    };
+    if !axis_letters.contains(&first_char)
+        && !axis_letters.contains(&first_char.to_ascii_lowercase())
+    {
+        return (word, "");
+    }
+    // Второй символ — начало значения (переносим safe byte index)
+    let value_start = chars.next().map(|(i, _)| i).unwrap_or(word.len());
+    (&word[..value_start], &word[value_start..])
+}
+
+/// Выделяет букву оси и выражение из AxisExpr вида "Z=71.304" или "X=160+10".
+fn split_axis_expr(word: &str) -> Option<(&str, &str)> {
+    let axis_letters = ['X', 'Y', 'Z', 'A', 'B', 'C', 'U', 'V', 'W'];
+    if word.len() < 3 || !word.contains('=') {
+        return None;
+    }
+    let fc = word.chars().next().unwrap();
+    if !axis_letters.contains(&fc) && !axis_letters.contains(&fc.to_ascii_lowercase()) {
+        return None;
+    }
+    if word.as_bytes()[1] == b'=' {
+        Some((&word[..1], &word[2..]))
+    } else {
+        None
+    }
+}
+
+/// Инвертирует выражение: "1+10" → "-(1+10)", "-20-10" → "-(-20-10)", "71.304" → "-71.304".
+fn invert_expression(expr: &str) -> String {
+    let trimmed = expr.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    // Проверяем операторы в теле (после возможного начального минуса)
+    let check_body = if let Some(stripped) = trimmed.strip_prefix('-') {
+        stripped
+    } else {
+        trimmed
+    };
+    let has_operator = check_body.contains('+')
+        || check_body.contains('-')
+        || check_body.contains('*')
+        || check_body.contains('/');
+    if has_operator {
+        // Выражение с операторами — оборачиваем с минусом
+        format!("-({})", trimmed)
+    } else if let Some(stripped) = trimmed.strip_prefix('-') {
+        // Простое отрицательное число/параметр: -71 → 71, -R20 → R20
+        stripped.to_string()
+    } else {
+        // Простое положительное: 71 → -71, R20 → -R20
+        format!("-{}", trimmed)
+    }
+}
+
+/// Инвертирует знак у указанной оси в тексте G-кода.
+pub(crate) fn invert_axes_by_letter(text: &str, axis_letter: &str) -> String {
+    if axis_letter.len() != 1 {
+        return text.to_string();
+    }
+    let target = axis_letter.chars().next().unwrap();
+    let axis_letters = ['X', 'Y', 'Z', 'A', 'B', 'C', 'U', 'V', 'W'];
+    if !axis_letters.contains(&target) && !axis_letters.contains(&target.to_ascii_lowercase()) {
+        return text.to_string();
+    }
+    let bytes = text.as_bytes();
+    let mut result = String::with_capacity(text.len());
+    let mut i = 0;
+    let mut in_comment = false;
+    while i < bytes.len() {
+        let ch = bytes[i] as char;
+        if ch == ';' {
+            in_comment = true;
+            result.push(ch);
+            i += 1;
+            continue;
+        }
+        if ch == '\n' {
+            in_comment = false;
+            result.push(ch);
+            i += 1;
+            continue;
+        }
+        if in_comment {
+            result.push(ch);
+            i += 1;
+            continue;
+        }
+        let upper = ch.to_ascii_uppercase();
+        let target_upper = target.to_ascii_uppercase();
+        if upper == target_upper
+            && i + 1 < bytes.len()
+            && (bytes[i + 1].is_ascii_digit()
+                || bytes[i + 1] as char == '-'
+                || bytes[i + 1] as char == '+')
+        {
+            let axis = ch;
+            i += 1;
+            let start = i;
+            let negative = bytes[i] as char == '-';
+            if negative || bytes[i] as char == '+' {
+                i += 1;
+            }
+            while i < bytes.len() && (bytes[i].is_ascii_digit() || bytes[i] as char == '.') {
+                i += 1;
+            }
+            if i > start {
+                let value_str = &text[start..i];
+                let inverted = if negative {
+                    value_str[1..].to_string()
+                } else {
+                    format!("-{value_str}")
+                };
+                result.push(axis);
+                result.push_str(&inverted);
+            } else {
+                result.push(axis);
+                result.push_str(&text[start..i]);
+            }
+        } else if upper == target_upper && i + 2 < bytes.len() && bytes[i + 1] as char == '=' {
+            let axis = ch;
+            i += 2; // пропускаем '=', теперь i указывает после '='
+            let start = i;
+            if i < bytes.len() {
+                // Читаем всё выражение до пробела/конца строки
+                while i < bytes.len() && !bytes[i].is_ascii_whitespace() && bytes[i] as char != ';'
+                {
+                    i += 1;
+                }
+                if i > start {
+                    let expr = &text[start..i];
+                    let inverted = invert_expression(expr);
+                    result.push(axis);
+                    result.push('=');
+                    result.push_str(&inverted);
+                } else {
+                    result.push(axis);
+                    result.push('=');
+                }
+            } else {
+                result.push(axis);
+                result.push('=');
+            }
+        } else {
+            result.push(ch);
+            i += 1;
+        }
+    }
+    result
 }
 
 /// Функция сохранения настроек

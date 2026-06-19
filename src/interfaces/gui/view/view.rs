@@ -11,7 +11,7 @@ use crate::shared::i18n;
 
 use crate::infrastructure::highlight::build_highlighted_job;
 
-use crate::interfaces::gui::intent::Intent;
+use crate::interfaces::gui::intent::{AxisSwapMode, Intent};
 use crate::interfaces::gui::model::Model;
 
 /// Собирает намерения от UI: меню + панель инструментов.
@@ -74,6 +74,10 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &Model) -> Vec
                 }
                 if ui.button(&i18n::locale().menu.replace).clicked() {
                     intents.push(Intent::ToggleReplace);
+                    ui.close_menu();
+                }
+                if ui.button(&i18n::locale().menu.axis_swap).clicked() {
+                    intents.push(Intent::ToggleAxisSwap);
                     ui.close_menu();
                 }
                 ui.separator();
@@ -616,6 +620,126 @@ pub fn view_replace_dialog(model: &mut Model, ctx: &egui::Context) -> Vec<Intent
 
     if !open_copy {
         intents.push(Intent::CloseSearchDialog);
+    }
+
+    intents
+}
+
+/// Отрисовывает диалог замены осей.
+pub fn view_axis_swap_dialog(model: &mut Model, ctx: &egui::Context) -> Vec<Intent> {
+    let mut intents = Vec::new();
+    if !model.axis_swap_open() {
+        return intents;
+    }
+
+    let mut open_copy = true;
+    let loc = i18n::locale();
+    egui::Window::new(&loc.axis_swap.title)
+        .open(&mut open_copy)
+        .resizable(false)
+        .collapsible(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .default_size([320.0, 220.0])
+        .show(ctx, |ui| {
+            // Escape → закрыть
+            if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                intents.push(Intent::ToggleAxisSwap);
+                return;
+            }
+
+            // Радио-кнопки для выбора режима
+            let is_swap = *model.axis_swap_mode() == AxisSwapMode::Swap;
+            let is_invert = *model.axis_swap_mode() == AxisSwapMode::Invert;
+
+            ui.horizontal(|ui| {
+                if ui
+                    .selectable_label(is_swap, &loc.axis_swap.mode_swap)
+                    .clicked()
+                {
+                    intents.push(Intent::SetAxisSwapMode(AxisSwapMode::Swap));
+                }
+                if ui
+                    .selectable_label(is_invert, &loc.axis_swap.mode_invert)
+                    .clicked()
+                {
+                    intents.push(Intent::SetAxisSwapMode(AxisSwapMode::Invert));
+                }
+            });
+
+            ui.add_space(8.0);
+
+            // Поля для swap-режима
+            if is_swap {
+                let mut axis1 = model.axis_swap_axis1().to_string();
+                let mut axis2 = model.axis_swap_axis2().to_string();
+
+                ui.horizontal(|ui| {
+                    ui.label(&loc.axis_swap.axis1_hint);
+                    ui.add_sized(
+                        [60.0, 22.0],
+                        egui::TextEdit::singleline(&mut axis1)
+                            .char_limit(1)
+                            .hint_text("Z"),
+                    );
+                });
+                if axis1 != model.axis_swap_axis1() {
+                    intents.push(Intent::SetSwapAxis1(axis1.to_uppercase()));
+                }
+
+                ui.add_space(4.0);
+
+                ui.horizontal(|ui| {
+                    ui.label(&loc.axis_swap.axis2_hint);
+                    ui.add_sized(
+                        [60.0, 22.0],
+                        egui::TextEdit::singleline(&mut axis2)
+                            .char_limit(1)
+                            .hint_text("X"),
+                    );
+                });
+                if axis2 != model.axis_swap_axis2() {
+                    intents.push(Intent::SetSwapAxis2(axis2.to_uppercase()));
+                }
+            } else {
+                // Поле для инвертирования
+                let mut invert_axis = model.axis_invert_axis().to_string();
+                ui.horizontal(|ui| {
+                    ui.label(&loc.axis_swap.axis1_hint);
+                    ui.add_sized(
+                        [60.0, 22.0],
+                        egui::TextEdit::singleline(&mut invert_axis)
+                            .char_limit(1)
+                            .hint_text("X"),
+                    );
+                });
+                if invert_axis != model.axis_invert_axis() {
+                    intents.push(Intent::SetInvertAxis(invert_axis.to_uppercase()));
+                }
+            }
+
+            ui.add_space(12.0);
+
+            // Кнопки
+            let can_apply = if is_swap {
+                model.axis_swap_axis1().len() == 1 && model.axis_swap_axis2().len() == 1
+            } else {
+                model.axis_invert_axis().len() == 1
+            };
+            ui.horizontal(|ui| {
+                if ui
+                    .add_enabled(can_apply, egui::Button::new(&loc.axis_swap.btn_apply))
+                    .clicked()
+                {
+                    intents.push(Intent::ApplyAxisSwap);
+                }
+                if ui.button(&loc.axis_swap.btn_cancel).clicked() {
+                    intents.push(Intent::ToggleAxisSwap);
+                }
+            });
+        });
+
+    if !open_copy {
+        intents.push(Intent::ToggleAxisSwap);
     }
 
     intents

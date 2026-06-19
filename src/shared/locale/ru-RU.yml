@@ -27,6 +27,7 @@ menu:
   validate: "Проверить   F6"
   search: "Поиск...   Ctrl+F"
   replace: "Замена...   Ctrl+H"
+  axis_swap: "Замена осей..."
   format_settings: "Настройки форматирования..."
   help: "Помощь"
   shortcuts: "Горячие клавиши"
@@ -78,6 +79,15 @@ replace:
   btn_cancel: "Отмена"
   not_found: "Не найдено"
   replaced: "Заменено"
+
+axis_swap:
+  title: "Замена осей"
+  mode_swap: "Поменять местами"
+  mode_invert: "Инвертировать знак"
+  axis1_hint: "Первая ось (напр. Z)"
+  axis2_hint: "Вторая ось (напр. X)"
+  btn_apply: "Заменить"
+  btn_cancel: "Отмена"
 
 settings:
   title: "Настройки форматирования"

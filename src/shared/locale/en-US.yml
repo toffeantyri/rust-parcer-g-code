@@ -27,6 +27,7 @@ menu:
   validate: "Validate   F6"
   search: "Search...   Ctrl+F"
   replace: "Replace...   Ctrl+H"
+  axis_swap: "Swap Axes..."
   format_settings: "Format Settings..."
   help: "Help"
   shortcuts: "Shortcuts"
@@ -78,6 +79,15 @@ replace:
   btn_cancel: "Cancel"
   not_found: "Not found"
   replaced: "Replaced"
+
+axis_swap:
+  title: "Swap Axes"
+  mode_swap: "Swap"
+  mode_invert: "Invert sign"
+  axis1_hint: "First axis (e.g. Z)"
+  axis2_hint: "Second axis (e.g. X)"
+  btn_apply: "Replace"
+  btn_cancel: "Cancel"
 
 settings:
   title: "Format Settings"

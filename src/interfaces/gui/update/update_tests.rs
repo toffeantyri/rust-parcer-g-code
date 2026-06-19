@@ -1,5 +1,6 @@
 use crate::interfaces::gui::intent::Intent;
 use crate::interfaces::gui::model::{Model, PendingAction};
+use crate::interfaces::gui::update::update::{invert_axes_by_letter, swap_axes};
 use crate::shared::i18n;
 
 /// Блокировка для глобального состояния i18n::LANG.
@@ -310,4 +311,100 @@ fn test_replace_find_next_cycles() {
 
     m.apply(&Intent::ReplaceFindNext);
     assert_eq!(m.replace_index(), 0);
+}
+
+// -----------------------------------------------------------------------
+// Замена осей: swap_axes, invert_axes
+// -----------------------------------------------------------------------
+
+#[test]
+fn test_swap_axes_z_x() {
+    let input = "G0 X10 Z20\nG1 X-5 Z=71.304";
+    let result = swap_axes(input, "Z", "X");
+    assert_eq!(result, "G0 Z10 X20\nG1 Z-5 X=71.304");
+}
+
+#[test]
+fn test_swap_axes_same_axis_noop() {
+    let input = "G0 X10 Z20";
+    let result = swap_axes(input, "X", "X");
+    assert_eq!(result, input);
+}
+
+#[test]
+fn test_invert_axes_simple() {
+    // Простое число → инвертируется
+    let input = "G0 X10 Y-20 X=71.304";
+    let result = invert_axes_by_letter(input, "X");
+    assert_eq!(result, "G0 X-10 Y-20 X=-71.304");
+}
+
+#[test]
+fn test_invert_axes_expr() {
+    // AxisExpr с выражением → оборачивается в -(expr)
+    let input = "G0 Z=1+10 X=-20-10";
+    let result = invert_axes_by_letter(input, "X");
+    assert_eq!(result, "G0 Z=1+10 X=-(-20-10)");
+}
+
+#[test]
+fn test_invert_axes_expr_positive() {
+    // Положительное выражение без минуса
+    let input = "G0 X=5*3/2";
+    let result = invert_axes_by_letter(input, "X");
+    assert_eq!(result, "G0 X=-(5*3/2)");
+}
+
+#[test]
+fn test_invert_axes_expr_negative() {
+    // Отрицательное выражение
+    let input = "G0 X=-100+50";
+    let result = invert_axes_by_letter(input, "X");
+    assert_eq!(result, "G0 X=-(-100+50)");
+}
+
+#[test]
+fn test_invert_axes_mixed_axes() {
+    // Инвертируется только указанная ось
+    let input = "G0 X10 Y-20 Z=71.304";
+    let result = invert_axes_by_letter(input, "Z");
+    assert_eq!(result, "G0 X10 Y-20 Z=-71.304");
+}
+
+#[test]
+fn test_invert_axes_r_param() {
+    // R-параметр: -R20 → R20
+    let input = "G0 Z=-R20";
+    let result = invert_axes_by_letter(input, "Z");
+    assert_eq!(result, "G0 Z=R20");
+}
+
+#[test]
+fn test_invert_axes_r_param_expr() {
+    // Выражение с R-параметром: -R100+R1 → -(-R100+R1)
+    let input = "G0 Z=-R100+R1";
+    let result = invert_axes_by_letter(input, "Z");
+    assert_eq!(result, "G0 Z=-(-R100+R1)");
+}
+
+#[test]
+fn test_invert_axes_r_param_positive() {
+    // R100+20 → -(R100+20)
+    let input = "G0 Z=R100+20";
+    let result = invert_axes_by_letter(input, "Z");
+    assert_eq!(result, "G0 Z=-(R100+20)");
+}
+
+#[test]
+fn test_invert_axes_no_axes() {
+    let input = "G0 M3 S1000";
+    let result = invert_axes_by_letter(input, "X");
+    assert_eq!(result, "G0 M3 S1000");
+}
+
+#[test]
+fn test_invert_axes_with_comments() {
+    let input = "G0 X10 ; comment Z20";
+    let result = invert_axes_by_letter(input, "X");
+    assert_eq!(result, "G0 X-10 ; comment Z20");
 }

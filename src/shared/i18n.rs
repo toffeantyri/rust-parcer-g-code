@@ -20,6 +20,7 @@ pub struct Locale {
     pub settings: SettingsStrings,
     pub search: SearchStrings,
     pub replace: ReplaceStrings,
+    pub axis_swap: AxisSwapStrings,
 }
 
 #[derive(Deserialize, Clone)]
@@ -62,6 +63,7 @@ pub struct MenuStrings {
     pub lang_en: String,
     pub search: String,
     pub replace: String,
+    pub axis_swap: String,
 }
 
 #[derive(Deserialize, Clone)]
@@ -109,6 +111,17 @@ pub struct ReplaceStrings {
     pub btn_cancel: String,
     pub not_found: String,
     pub replaced: String,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct AxisSwapStrings {
+    pub title: String,
+    pub mode_swap: String,
+    pub mode_invert: String,
+    pub axis1_hint: String,
+    pub axis2_hint: String,
+    pub btn_apply: String,
+    pub btn_cancel: String,
 }
 
 // ---------------------------------------------------------------------------

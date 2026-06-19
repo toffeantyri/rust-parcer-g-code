@@ -50,4 +50,24 @@ pub enum Intent {
     DoReplaceSearch,
     /// Найти следующее вхождение в диалоге замены
     ReplaceFindNext,
+    /// Открыть диалог замены осей
+    ToggleAxisSwap,
+    /// Установить первую ось для swap
+    SetSwapAxis1(String),
+    /// Установить вторую ось для swap
+    SetSwapAxis2(String),
+    /// Установить ось для инвертирования
+    SetInvertAxis(String),
+    /// Установить режим: Swap или Invert
+    SetAxisSwapMode(AxisSwapMode),
+    /// Выполнить замену осей
+    ApplyAxisSwap,
+}
+
+/// Режим замены осей
+#[derive(Debug, Clone, PartialEq, Default)]
+pub enum AxisSwapMode {
+    #[default]
+    Swap,
+    Invert,
 }
