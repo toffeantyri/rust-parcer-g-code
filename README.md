@@ -120,7 +120,17 @@ source ~/.cargo/env
 ```sh
 git clone https://github.com/toffeantyri/rust-parcer-g-code.git
 cd rust-parcer-g-code
-cargo run --release --bin editor
+cargo run --bin editor --features desktop
+```
+
+### 3. Сборка под Android
+```sh
+# Установить Java JDK 21+, LLVM/clang, Rust Android target
+rustup target add aarch64-linux-android
+cargo install xbuild
+
+# Сборка и запуск на устройстве
+x run --features android --device adb:<device_id>
 ```
 
 ## Системные требования
@@ -131,9 +141,13 @@ cargo run --release --bin editor
 ## Разработка
 
 ```sh
-cargo build              # Сборка
-cargo test               # Тесты (349 тестов)
-cargo run --bin editor   # Запуск GUI
+cargo build --bin editor --features desktop   # Сборка десктоп
+cargo test                                    # Тесты (323 lib + 26 gui = 349)
+cargo run --bin editor --features desktop       # Запуск GUI
+
+# Android
+x build --features android --format apk         # Сборка APK
+x run --features android --device adb:<id>      # Запуск на устройстве
 ```
 
 ### Архитектура
@@ -142,8 +156,15 @@ cargo run --bin editor   # Запуск GUI
 src/
 ├── domain/          # Сущности, трейты (Token, Statement, Lexer)
 ├── application/     # Use cases (Parser, Formatter, Validator)
-├── infrastructure/  # Реализации (лексер, подсветка синтаксиса)
+├── infrastructure/  # Реализации (лексер, подсветка, platform/)
+│   └── platform/    # Платформенные адаптеры (desktop: rfd, android: SAF)
 ├── interfaces/      # GUI на egui (MVI: Model-View-Intent)
+│   └── gui/
+│       ├── app/     # desktop.rs (eframe) / android.rs (android-activity)
+│       ├── view/    # view_desktop.rs / view_android.rs
+│       ├── model/   # Общая модель (переиспользуется)
+│       ├── intent/  # Общие интенты
+│       └── update/  # Общая логика
 ├── data_layer/      # Отдельный поток (пайплайн: лексер→парсер→валидатор→форматтер)
 └── shared/          # Утилиты, локализация (i18n), типы ошибок (thiserror)
 ```
@@ -186,7 +207,17 @@ source ~/.cargo/env
 ```sh
 git clone https://github.com/toffeantyri/rust-parcer-g-code.git
 cd rust-parcer-g-code
-cargo run --release --bin editor
+cargo run --bin editor --features desktop
+```
+
+### 3. Build for Android
+```sh
+# Install Java JDK 21+, LLVM/clang, Rust Android target
+rustup target add aarch64-linux-android
+cargo install xbuild
+
+# Build and run on device
+x run --features android --device adb:<device_id>
 ```
 
 ## Requirements
@@ -197,9 +228,13 @@ cargo run --release --bin editor
 ## Development
 
 ```sh
-cargo build              # Build
-cargo test               # Tests (349 tests)
-cargo run --bin editor   # Run GUI
+cargo build --bin editor --features desktop   # Build desktop
+cargo test                                    # Tests (323 lib + 26 gui = 349)
+cargo run --bin editor --features desktop       # Run GUI
+
+# Android
+x build --features android --format apk         # Build APK
+x run --features android --device adb:<id>      # Run on device
 ```
 
 ### Architecture
@@ -208,8 +243,15 @@ cargo run --bin editor   # Run GUI
 src/
 ├── domain/          # Entities and traits (Token, Statement, Lexer)
 ├── application/     # Use cases (Parser, Formatter, Validator)
-├── infrastructure/  # Implementations (lexer, syntax highlighting)
+├── infrastructure/  # Implementations (lexer, highlighting, platform/)
+│   └── platform/    # Platform adapters (desktop: rfd, android: SAF)
 ├── interfaces/      # egui GUI (MVI: Model-View-Intent)
+│   └── gui/
+│       ├── app/     # desktop.rs (eframe) / android.rs (android-activity)
+│       ├── view/    # view_desktop.rs / view_android.rs
+│       ├── model/   # Shared model (reused across platforms)
+│       ├── intent/  # Shared intents
+│       └── update/  # Shared logic
 ├── data_layer/      # Separate thread (pipeline: lexer→parser→validator→formatter)
 └── shared/          # Utilities, localization (i18n), error types (thiserror)
 ```
