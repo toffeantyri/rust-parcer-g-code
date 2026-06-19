@@ -130,6 +130,7 @@ rustup target add aarch64-linux-android
 cargo install xbuild
 
 # Сборка и запуск на устройстве
+# adb devices - device_id - copy
 x run --features android --device adb:<device_id>
 ```
 
@@ -256,4 +257,3 @@ src/
 └── shared/          # Utilities, localization (i18n), error types (thiserror)
 ```
 ```
-

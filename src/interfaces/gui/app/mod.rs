@@ -11,7 +11,7 @@ mod app;
 #[allow(clippy::module_inception)]
 mod app;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "desktop"))]
 #[path = "desktop_tests.rs"]
 mod tests;
 

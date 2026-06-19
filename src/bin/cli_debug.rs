@@ -133,7 +133,6 @@ fn main() {
     println!();
 
     use code_parser::application::{FormatConfig, Formatter, Parser};
-    use code_parser::shared::Severity;
 
     let fmt_tokens = tokenize(&input);
     let mut fmt_parser = Parser::new(fmt_tokens);

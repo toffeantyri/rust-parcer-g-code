@@ -12,6 +12,10 @@ mod view;
 mod view;
 
 pub use view::{
-    collect_intents, view_axis_swap_dialog, view_editor, view_exit_dialog, view_replace_dialog,
-    view_search_dialog, view_settings, view_shortcuts, view_statusbar,
+    collect_intents, view_editor, view_exit_dialog, view_replace_dialog, view_search_dialog,
+    view_settings, view_shortcuts, view_statusbar,
 };
+
+// view_axis_swap_dialog — только на десктопе (на Android заглушка не используется)
+#[cfg(not(target_os = "android"))]
+pub use view::view_axis_swap_dialog;

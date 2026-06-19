@@ -76,6 +76,7 @@ pub fn view_replace_dialog(_model: &mut Model, _ctx: &egui::Context) -> Vec<Inte
     Vec::new()
 }
 
+#[allow(dead_code)]
 pub fn view_axis_swap_dialog(_model: &mut Model, _ctx: &egui::Context) -> Vec<Intent> {
     Vec::new()
 }
