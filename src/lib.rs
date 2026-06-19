@@ -18,30 +18,17 @@ pub mod shared;
 /// ANativeActivity_onCreate генерируется android-activity (feature native-activity).
 #[cfg(target_os = "android")]
 mod android {
-    use std::sync::mpsc;
-    use std::time::Duration;
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
 
     use android_activity::{AndroidApp, MainEvent, PollEvent};
+    use glutin::display::GlDisplay;
+    use glutin::prelude::GlSurface;
+    use glutin::prelude::*;
+    use raw_window_handle::HasRawWindowHandle;
 
-    use crate::data_layer::{spawn_data_layer, EditorCommand};
+    use crate::data_layer::spawn_data_layer;
     use crate::interfaces::gui::GCodeApp;
-
-    /// Состояние Android-приложения.
-    struct AndroidState {
-        gcode_app: GCodeApp,
-        #[allow(dead_code)]
-        cmd_tx: mpsc::Sender<EditorCommand>,
-        last_content_hash: u64,
-        needs_redraw: bool,
-    }
-
-    /// Простой хеш для отслеживания изменений контента.
-    fn hash_str(s: &str) -> u64 {
-        use std::hash::{Hash, Hasher};
-        let mut h = std::hash::DefaultHasher::new();
-        s.hash(&mut h);
-        h.finish()
-    }
 
     #[no_mangle]
     pub fn android_main(app: AndroidApp) {
@@ -52,64 +39,221 @@ mod android {
         );
         log::info!("android_main: G-Code Editor Android started!");
 
-        let (cmd_tx, evt_rx) = spawn_data_layer();
-        let gcode_app = GCodeApp::new(cmd_tx.clone(), evt_rx);
-        let content_hash = hash_str(gcode_app.model.content());
+        let (_cmd_tx, evt_rx) = spawn_data_layer();
+        let mut gcode_app = GCodeApp::new(_cmd_tx, evt_rx);
 
-        let mut state = AndroidState {
-            gcode_app,
-            cmd_tx,
-            last_content_hash: content_hash,
-            needs_redraw: true,
-        };
+        let egui_ctx = egui::Context::default();
+        let mut egui_painter: Option<egui_glow::Painter> = None;
+        let mut last_content_hash: u64 = 0;
+        let mut needs_redraw = true;
+        let mut last_frame = Instant::now();
+        let mut egl_display: Option<glutin::display::Display> = None;
+        let mut egl_surface: Option<glutin::surface::Surface<glutin::surface::WindowSurface>> =
+            None;
+        let mut egl_context: Option<glutin::context::PossiblyCurrentContext> = None;
 
         loop {
-            // Обрабатываем события с дедлайном 16ms (~60 fps max)
-            app.poll_events(Some(Duration::from_millis(16)), |event| match event {
+            let mut native_window: Option<ndk::native_window::NativeWindow> = None;
+
+            app.poll_events(None, |event| match event {
                 PollEvent::Wake | PollEvent::Timeout => {}
                 PollEvent::Main(e) => match e {
                     MainEvent::InitWindow { .. } => {
                         log::info!("Lifecycle: InitWindow");
-                        state.needs_redraw = true;
+                        native_window = app.native_window();
+                        needs_redraw = true;
                     }
                     MainEvent::Resume { .. } => log::info!("Lifecycle: Resume"),
                     MainEvent::Pause { .. } => log::info!("Lifecycle: Pause"),
-                    MainEvent::Stop { .. } => log::info!("Lifecycle: Stop"),
-                    MainEvent::Start { .. } => log::info!("Lifecycle: Start"),
+                    MainEvent::Stop { .. } => {
+                        log::info!("Lifecycle: Stop — exiting");
+                        return;
+                    }
                     MainEvent::Destroy { .. } => {
                         log::info!("Lifecycle: Destroy — exiting");
                         return;
                     }
                     MainEvent::RedrawNeeded { .. } => {
-                        state.needs_redraw = true;
-                    }
-                    MainEvent::WindowResized { .. } => {
-                        state.needs_redraw = true;
+                        needs_redraw = true;
                     }
                     _ => {}
                 },
                 _ => {}
             });
 
-            // Проверяем события от data layer (GCodeApp сам дренирует канал)
-            if state.gcode_app.poll_events() {
-                state.needs_redraw = true;
+            // Инициализация EGL + egui при получении окна
+            if egl_display.is_none() && native_window.is_some() {
+                let nw = native_window.as_ref().unwrap();
+                log::info!("Initializing EGL + egui...");
+
+                // Создаём EGL display через glutin (Android использует EGL по умолчанию)
+                let display = unsafe {
+                    glutin::display::Display::new(
+                        raw_window_handle::RawDisplayHandle::Android(
+                            raw_window_handle::AndroidDisplayHandle::empty(),
+                        ),
+                        glutin::display::DisplayApiPreference::Egl,
+                    )
+                };
+
+                match display {
+                    Ok(dpy) => {
+                        let config = unsafe {
+                            dpy.find_configs(glutin::config::ConfigTemplateBuilder::new().build())
+                                .unwrap()
+                                .next()
+                                .unwrap()
+                        };
+
+                        let surface = unsafe {
+                            dpy.create_window_surface(
+                                &config,
+                                &glutin::surface::SurfaceAttributesBuilder::<
+                                    glutin::surface::WindowSurface,
+                                >::new()
+                                .build(
+                                    nw.raw_window_handle(),
+                                    std::num::NonZeroU32::new(800).unwrap(),
+                                    std::num::NonZeroU32::new(600).unwrap(),
+                                ),
+                            )
+                        };
+
+                        match surface {
+                            Ok(surface) => {
+                                let ctx = unsafe {
+                                    dpy.create_context(
+                                        &config,
+                                        &glutin::context::ContextAttributesBuilder::new()
+                                            .with_context_api(glutin::context::ContextApi::Gles(
+                                                None,
+                                            ))
+                                            .build(None),
+                                    )
+                                };
+
+                                match ctx {
+                                    Ok(ctx) => {
+                                        let ctx = ctx.make_current(&surface);
+                                        match ctx {
+                                            Ok(ctx) => {
+                                                let gl = unsafe {
+                                                    glow::Context::from_loader_function(|name| {
+                                                        let cname =
+                                                            std::ffi::CStr::from_ptr(name.as_ptr()
+                                                                as *const std::os::raw::c_char);
+                                                        dpy.get_proc_address(cname).cast()
+                                                    })
+                                                };
+
+                                                let painter = egui_glow::Painter::new(
+                                                    Arc::new(gl),
+                                                    "",
+                                                    None,
+                                                    true,
+                                                );
+
+                                                match painter {
+                                                    Ok(painter) => {
+                                                        egl_display = Some(dpy);
+                                                        egl_surface = Some(surface);
+                                                        egl_context = Some(ctx);
+                                                        egui_painter = Some(painter);
+                                                        log::info!("EGL + egui painter created!");
+                                                        needs_redraw = true;
+                                                    }
+                                                    Err(e) => log::error!("Painter error: {:?}", e),
+                                                }
+                                            }
+                                            Err(e) => {
+                                                log::error!("make_current error: {:?}", e)
+                                            }
+                                        }
+                                    }
+                                    Err(e) => log::error!("create_context error: {:?}", e),
+                                }
+                            }
+                            Err(e) => log::error!("create_window_surface error: {:?}", e),
+                        }
+                    }
+                    Err(e) => log::error!("create display error: {:?}", e),
+                }
             }
 
-            // Проверяем изменился ли контент с момента прошлого кадра
-            let new_hash = hash_str(state.gcode_app.model.content());
-            if new_hash != state.last_content_hash {
-                state.last_content_hash = new_hash;
-                state.needs_redraw = true;
+            // События от data layer
+            if gcode_app.poll_events() {
+                needs_redraw = true;
             }
 
-            // Рендеринг только при необходимости
-            if state.needs_redraw {
-                state.needs_redraw = false;
-                // TODO: render_ui(&mut state);
-                log::debug!("Redraw frame");
+            let new_hash = hash_str(gcode_app.model.content());
+            if new_hash != last_content_hash {
+                last_content_hash = new_hash;
+                needs_redraw = true;
             }
+
+            let now = Instant::now();
+            if needs_redraw && now.duration_since(last_frame) >= Duration::from_millis(16) {
+                needs_redraw = false;
+                last_frame = now;
+
+                if let (Some(ref mut painter), Some(ref surface), Some(ref ctx)) =
+                    (&mut egui_painter, &egl_surface, &egl_context)
+                {
+                    let raw_input = egui::RawInput::default();
+                    let full_output = egui_ctx.run(raw_input, |ctx| {
+                        egui::CentralPanel::default().show(ctx, |ui| {
+                            ui.vertical_centered(|ui| {
+                                ui.add_space(50.0);
+                                ui.heading("G-Code Editor");
+                                ui.add_space(20.0);
+                                ui.label(format!("Status: {}", gcode_app.model.status()));
+                                ui.label(format!(
+                                    "File: {}",
+                                    if gcode_app.model.file_path().is_empty() {
+                                        "(none)"
+                                    } else {
+                                        gcode_app.model.file_path()
+                                    }
+                                ));
+                            });
+                        });
+                    });
+
+                    // Очищаем экран тёмно-серым фоном
+                    unsafe {
+                        use glow::HasContext;
+                        let gl = painter.gl();
+                        gl.clear_color(0.2, 0.2, 0.2, 1.0);
+                        gl.clear(glow::COLOR_BUFFER_BIT);
+                    }
+
+                    let size = (800, 600); // фиксированный размер, позже сделаем динамическим
+                    let (w, h) = size;
+                    let primitives: Vec<egui::epaint::ClippedPrimitive> =
+                        egui_ctx.tessellate(full_output.shapes, full_output.pixels_per_point);
+                    painter.paint_and_update_textures(
+                        [w, h],
+                        full_output.pixels_per_point,
+                        &primitives,
+                        &full_output.textures_delta,
+                    );
+
+                    if let Err(e) = surface.swap_buffers(ctx) {
+                        log::warn!("swap_buffers error: {:?}", e);
+                    }
+                }
+            }
+
+            // Небольшая задержка чтобы не грузить CPU
+            std::thread::sleep(Duration::from_millis(1));
         }
+    }
+
+    fn hash_str(s: &str) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::hash::DefaultHasher::new();
+        s.hash(&mut h);
+        h.finish()
     }
 }
 

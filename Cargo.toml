@@ -36,7 +36,8 @@ logos = "0.14"
 
 # GUI — egui работает на всех платформах
 egui = "0.31"
-egui_glow = "0.31"
+egui_glow = { version = "0.31", features = ["winit"] }
+glow = "0.16"
 
 # Десктоп (eframe + rfd)
 eframe = { version = "0.31", default-features = false, features = ["default", "glow", "wgpu", "x11"], optional = true }
@@ -52,6 +53,9 @@ serde_yaml = "0.9"
 android-activity = { version = "0.6", features = ["native-activity"] }
 android_logger = "0.14"
 log = "0.4"
+glutin = { version = "0.31", default-features = false, features = ["egl"] }
+ndk = { version = "0.9", features = ["rwh_05"] }
+raw-window-handle = "0.5"
 
 [build-dependencies]
 
