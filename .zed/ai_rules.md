@@ -4,22 +4,33 @@
 Ты — эксперт по Rust и чистой архитектуре. Следуешь строгим правилам генерации кода. Придерживаешься инструкций описанных в этом файле. Отвечаешь только на русском. Коммит и пуш только по запросу от пользователя.
 
 ## Проект
-- Мы создаём приложение для форматирования программ G-кода для станков с ЧПУ с графическим интерфейсом.
+- Мы создаём мультиплатформенное приложение для форматирования программ G-кода для станков с ЧПУ.
+- Целевые платформы: **десктоп** (Windows, Linux, macOS) и **Android**.
 - Программа умеет нумеровать кадры, расставлять пробелы между кодами, сохраняя целостность и последовательность команд. В коде могут встречаться специфические для станка команды — которые не должны изменяться.
-- GUI реализован на egui (eframe), архитектура MVI.
+- GUI реализован на egui (eframe для десктопа, egui_glow + android-activity для Android), архитектура MVI.
+- Десктопные зависимости (eframe, rfd) — через feature `desktop`, Android (android-activity) — через feature `android`. Общие (egui, egui_glow) — без флагов.
+- Десктоп: `cargo run --bin editor --features desktop`. Android: `x run --features android --device adb:<id>`.
 
 ## Структура проекта (Clean Architecture + Data Layer)
 - `src/domain/` — сущности и бизнес-логика (не зависит от фреймворков)
 - `src/application/` — use cases / интеракторы (парсер, форматтер, валидатор)
-- `src/infrastructure/` — внешние зависимости (лексер, IO)
-- `src/interfaces/` — GUI-обработчики (egui MVI)
+- `src/infrastructure/` — внешние зависимости (лексер, подсветка, платформенные адаптеры)
+  - `platform/` — платформенные адаптеры: `desktop.rs` (rfd), `android.rs` (SAF-заглушка)
+- `src/interfaces/` — GUI-обработчики
+  - `gui/app/` — `desktop.rs` (eframe::App) / `android.rs` (заглушка)
+  - `gui/view/` — `view_desktop.rs` / `view_android.rs`
+  - `gui/model/`, `gui/intent/`, `gui/update/` — общие для всех платформ
 - `src/data_layer/` — отдельный поток для ресурсоёмких операций (pipeline, IO)
-- `src/shared/` — утилиты, конфиги, error types
+- `src/shared/` — утилиты, конфиги, локализация, error types
+- `src/bin/desktop_main.rs` — точка входа десктоп
+- `src/bin/android_main.rs` — точка входа Android (заглушка, реальная в lib.rs)
 
 ### Правила зависимости между слоями
 - **domain** → не зависит ни от чего.
 - **application** → зависит только от `domain` и `shared`.
 - **infrastructure** → зависит только от `domain` (реализует трейты).
+  - `platform/` — условная компиляция: десктоп через `rfd`, Android через SAF.
+  - Модуль `platform` доступен только с feature `desktop`.
 - **interfaces** → зависит от `application`, `infrastructure`, `shared`, `data_layer`. **Не зависит** от `domain` напрямую (доступ к domain только через application).
 - **data_layer** → зависит от `application`, `infrastructure`, `shared`. Импортирует `domain` только через `application`. Не зависит от `interfaces`.
 - **shared** → не зависит ни от чего.
@@ -68,13 +79,15 @@ main thread (egui UI)
 
 ### Правила data layer
 - **Tokio запрещён** — только `std::thread::spawn` и `std::sync::mpsc`.
-- Data thread запускается один раз в `src/bin/gui_main.rs()` и живёт весь цикл приложения.
+- Data thread запускается один раз в `src/bin/desktop_main.rs()` (десктоп) или в `ANativeActivity_onCreate` (Android, lib.rs) и живёт весь цикл приложения.
 - Все CPU-интенсивные вычисления (лексер, парсер, форматтер, валидатор) выполняются в data thread.
 - Всё синхронное чтение/запись файлов — в data thread.
 - **Coalesce TextChanged**: если в канале несколько `TextChanged` подряд — обрабатывается только последний.
 - **Debounce**: UI отправляет `TextChanged` не чаще раза в 100 мс.
 - **Блокировка UI**: пока data thread занят, кнопки Format/Validate/Open/Save блокируются флагом `is_busy`.
 - **Файловые диалоги** (`open`, `save as`) — синхронные (`rfd::FileDialog`), вызываются из UI потока по запросу data layer через `EditorEvent::RequestFilePicker`.
+  - На десктопе: `rfd::FileDialog` через `infrastructure/platform/desktop.rs`
+  - На Android: будет SAF через `infrastructure/platform/android.rs`
 - Выход: при закрытии окна data thread завершается автоматически (канал закрывается).
 
 ### EditorCommand (команды от UI к data layer)
@@ -109,11 +122,15 @@ main thread (egui UI)
 - Архитектура: **MVI (Model-View-Intent)**.
   - `model/` — состояние приложения. Поля — приватные, доступ через геттеры (`.content()`, `.is_busy()` и т.д.),
     мутация — через `apply(intent)` или `pub(crate)` сеттеры (`.set_content()`, `.set_error_lines()` и т.д.).
-    Флаг `editor_needs_focus` — устанавливается при загрузке файла, сбрасывается после фокуса редактора.
   - `intent/` — намерения пользователя (enum).
   - `update/` — редьюсер: чистая функция, мутирует model на основе intent.
-  - `view/` — отрисовка UI, возвращает intents.
-  - `app/` — точка входа фреймворка, соединяет слои.
+  - `view/` — отрисовка UI:
+    - `view_desktop.rs` — полный UI для десктопа (меню, диалоги, редактор)
+    - `view_android.rs` — заглушка (будет расширен)
+  - `app/` — точка входа фреймворка:
+    - `desktop.rs` — `eframe::App`, связывает UI с data layer
+    - `android.rs` — заглушка (android_main в lib.rs)
+- `model/`, `intent/`, `update/` — **общие**, переиспользуются на всех платформах без изменений.
 - Фреймворк UI — **immediate mode** (все виджеты пересоздаются каждый кадр).
 - `TextEdit` (редактор кода) — исключение из MVI: мутирует локальную копию, после кадра
   изменения сохраняются в модель через `set_content()`.
@@ -160,6 +177,14 @@ main thread (egui UI)
   Комментарии (`;...`) не нумеруются. Строки только со старым N-кодом удаляются (счётчик увеличивается).
 
 
+## Android
+- Точка входа: `#[no_mangle] fn android_main(app: AndroidApp)` в `src/lib.rs`.
+- `ANativeActivity_onCreate` генерируется крейтом `android-activity` (feature `native-activity`).
+- Сборка: `x run --features android --device adb:<id>` (требует Java JDK 21+, LLVM/clang, Rust target `aarch64-linux-android`).
+- Feature-гейтинг: `desktop` feature включает `eframe`/`rfd`, `android` feature включает `android-activity`.
+- Десктопная сборка: `cargo run --bin editor --features desktop`. Android: `--features android` (без desktop).
+- `egui`/`egui_glow` — общие зависимости, работают на обеих платформах.
+- UI на Android пока заглушка (`view_android.rs`), рендеринг через `egui_glow` будет добавлен.
 
 ## Пример ожидаемого ответа
 [План действий]: Создам сущность пользователя в domain слое
