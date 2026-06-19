@@ -110,6 +110,7 @@ impl GCodeApp {
             },
             EditorEvent::File(fe) => match fe {
                 FileEvent::Loaded { content, file_path } => {
+                    self.awaiting_picker = false;
                     self.model.set_content(content);
                     self.model.set_file_path(file_path);
                     self.model.set_modified(false);
@@ -120,6 +121,7 @@ impl GCodeApp {
                     self.model.set_editor_needs_focus(true);
                 }
                 FileEvent::Saved { file_path } => {
+                    self.awaiting_save_picker = false;
                     self.model.set_file_path(file_path);
                     self.model.set_modified(false);
                     self.model.set_is_busy(false);
@@ -149,9 +151,11 @@ impl GCodeApp {
             EditorEvent::Dialog(de) => match de {
                 DialogEvent::RequestFilePicker { mode } => match mode {
                     crate::data_layer::FilePickerMode::Open => {
+                        eprintln!("[Event] RequestFilePicker::Open");
                         self.awaiting_picker = true;
                     }
                     crate::data_layer::FilePickerMode::Save => {
+                        eprintln!("[Event] RequestFilePicker::Save");
                         self.awaiting_save_picker = true;
                     }
                 },
@@ -211,6 +215,15 @@ impl GCodeApp {
                 }
             }
             Intent::OpenFile => {
+                // Если файловый диалог уже открыт — игнорируем повторный запрос
+                if self.awaiting_picker || self.awaiting_save_picker {
+                    eprintln!(
+                        "[OpenFile] ignored: awaiting_picker={} awaiting_save={}",
+                        self.awaiting_picker, self.awaiting_save_picker
+                    );
+                    return;
+                }
+                eprintln!("[OpenFile] sending FileCommand::OpenFile");
                 if self.model.modified() && !self.model.file_path().is_empty() {
                     self.model.set_show_exit_dialog(true);
                     self.model
@@ -371,8 +384,8 @@ impl eframe::App for GCodeApp {
 
         // 4. Если data layer запрашивает file picker — показываем его
         if self.awaiting_picker {
-            self.awaiting_picker = false;
             let file = rfd::FileDialog::new().pick_file();
+            // НЕ сбрасываем awaiting_picker здесь — сбросится при FileEvent::Loaded
             let _ = self
                 .cmd_tx
                 .send(EditorCommand::Dialog(DialogCommand::FilePickerResult {
@@ -381,7 +394,6 @@ impl eframe::App for GCodeApp {
                 }));
         }
         if self.awaiting_save_picker {
-            self.awaiting_save_picker = false;
             let file = rfd::FileDialog::new().save_file();
             let _ = self
                 .cmd_tx

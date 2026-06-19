@@ -382,7 +382,7 @@ pub fn view_shortcuts(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
     egui::Window::new("⌨ ".to_string() + &i18n::locale().menu.shortcuts)
         .open(&mut open_copy)
         .resizable(false)
-        .default_size([420.0, 300.0])
+        .default_size([420.0, 360.0])
         .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
         .show(ctx, |ui| {
             use egui::RichText;
@@ -393,6 +393,8 @@ pub fn view_shortcuts(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
                 ("Ctrl+Shift+S", &i18n::locale().menu.save_as),
                 ("F5", &i18n::locale().menu.format),
                 ("F6", &i18n::locale().menu.validate),
+                ("Ctrl+F", &i18n::locale().menu.search),
+                ("Ctrl+H", &i18n::locale().menu.replace),
             ];
 
             ui.label(

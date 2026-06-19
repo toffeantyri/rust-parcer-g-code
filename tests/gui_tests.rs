@@ -45,10 +45,12 @@ fn test_menu_file_items() {
     file_menu.click();
     harness.run();
 
-    assert!(harness.query_by_label("Open...").is_some());
+    assert!(harness.query_by_label("Open...   Ctrl+O").is_some());
     // Save есть и в меню, и в тулбаре — используем query_all
     assert!(harness.query_all_by_label("Save").count() >= 2);
-    assert!(harness.query_by_label("Save as...").is_some());
+    assert!(harness
+        .query_by_label("Save as...   Ctrl+Shift+S")
+        .is_some());
     assert!(harness.query_by_label("Close").is_some());
     assert!(harness.query_by_label("Exit").is_some());
 }
@@ -94,8 +96,10 @@ fn test_menu_edit_items() {
     edit_menu.click();
     harness.run();
 
-    assert!(harness.query_by_label("Format (F5)").is_some());
-    assert!(harness.query_by_label("Validate (F6)").is_some());
+    assert!(harness.query_by_label("Format   F5").is_some());
+    assert!(harness.query_by_label("Validate   F6").is_some());
+    assert!(harness.query_by_label("Search...   Ctrl+F").is_some());
+    assert!(harness.query_by_label("Replace...   Ctrl+H").is_some());
     assert!(harness.query_by_label("Format Settings...").is_some());
 }
 
@@ -350,8 +354,11 @@ fn test_shortcuts_window_shown_when_open() {
     // Окно горячих клавиш должно быть видно — проверяем по содержимому
     assert!(harness.query_by_label("Ctrl+O").is_some());
     assert!(harness.query_by_label("Ctrl+S").is_some());
+    assert!(harness.query_by_label("Ctrl+Shift+S").is_some());
     assert!(harness.query_by_label("F5").is_some());
     assert!(harness.query_by_label("F6").is_some());
+    assert!(harness.query_by_label("Ctrl+F").is_some());
+    assert!(harness.query_by_label("Ctrl+H").is_some());
 }
 
 #[test]
