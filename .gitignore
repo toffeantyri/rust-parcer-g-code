@@ -34,3 +34,4 @@ Cargo.lock
 # Windows NUL device
 nul
 /test_content/
+test_content/
