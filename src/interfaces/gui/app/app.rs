@@ -385,8 +385,8 @@ impl eframe::App for GCodeApp {
 
         // 4. Если data layer запрашивает file picker — показываем его
         if self.awaiting_picker {
+            self.awaiting_picker = false;
             let file = rfd::FileDialog::new().pick_file();
-            // НЕ сбрасываем awaiting_picker здесь — сбросится при FileEvent::Loaded
             let _ = self
                 .cmd_tx
                 .send(EditorCommand::Dialog(DialogCommand::FilePickerResult {
@@ -395,6 +395,7 @@ impl eframe::App for GCodeApp {
                 }));
         }
         if self.awaiting_save_picker {
+            self.awaiting_save_picker = false;
             let file = rfd::FileDialog::new().save_file();
             let _ = self
                 .cmd_tx
