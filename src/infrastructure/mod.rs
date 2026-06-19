@@ -5,7 +5,7 @@
 
 pub mod highlight;
 pub mod lexer;
-#[cfg(not(target_os = "android"))]
+#[cfg(feature = "desktop")]
 pub mod platform;
 
 pub use lexer::DefaultLexer;

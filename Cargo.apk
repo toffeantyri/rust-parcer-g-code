@@ -4,7 +4,7 @@
     "version": "0.2.1",
     "display_name": "G-Code Editor",
     "activity": {
-      "name": "android.app.NativeActivity",
+      "name": "android.app.GameActivity",
       "config_changes": "orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout|screenSize|density",
       "launch_mode": "singleTask",
       "orientation": "unspecified",

@@ -7,13 +7,17 @@ description = "A parser and formatter library in Rust"
 
 [features]
 android = []  # feature-флаг для Android-сборки
+desktop = ["dep:eframe", "dep:rfd"]  # десктопные зависимости
+default = []  # не включаем ничего по умолчанию, десктопный бинарник включает desktop в Cargo.toml
 
 [lib]
 name = "code_parser"
+crate-type = ["lib", "cdylib"]
 
 [[bin]]
 name = "editor"
 path = "src/bin/desktop_main.rs"
+required-features = ["desktop"]
 
 [[bin]]
 name = "debug-tokens"
@@ -30,13 +34,13 @@ required-features = ["android"]
 thiserror = "2.0"
 logos = "0.14"
 
-rfd = "0.15"
-
-# GUI — wgpu + glow (wgpu основной исправляет баг glutin/wgl на Windows)
-# default-features = false выключает x11/wayland, поэтому добавляем явно
-eframe = { version = "0.31", default-features = false, features = ["default", "glow", "wgpu", "x11"] }
+# GUI — egui работает на всех платформах
 egui = "0.31"
 egui_glow = "0.31"
+
+# Десктоп (eframe + rfd)
+eframe = { version = "0.31", default-features = false, features = ["default", "glow", "wgpu", "x11"], optional = true }
+rfd = { version = "0.15", optional = true }
 
 # Сериализация настроек
 serde = { version = "1.0", features = ["derive"] }
@@ -47,6 +51,7 @@ serde_yaml = "0.9"
 [target.'cfg(target_os = "android")'.dependencies]
 android-activity = { version = "0.6", features = ["native-activity"] }
 android_logger = "0.14"
+log = "0.4"
 
 [build-dependencies]
 

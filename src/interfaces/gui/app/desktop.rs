@@ -12,6 +12,7 @@ use crate::data_layer::{
 use crate::interfaces::gui::model::PendingAction;
 use crate::shared::i18n;
 
+#[cfg(feature = "desktop")]
 use crate::infrastructure::platform;
 use crate::interfaces::gui::intent::Intent;
 use crate::interfaces::gui::model::Model;
@@ -385,6 +386,7 @@ impl eframe::App for GCodeApp {
         }
 
         // 4. Если data layer запрашивает file picker — показываем его
+        #[cfg(feature = "desktop")]
         if self.awaiting_picker {
             self.awaiting_picker = false;
             let file = platform::pick_file();
@@ -397,7 +399,10 @@ impl eframe::App for GCodeApp {
         }
         if self.awaiting_save_picker {
             self.awaiting_save_picker = false;
+            #[cfg(feature = "desktop")]
             let file = platform::save_file();
+            #[cfg(not(feature = "desktop"))]
+            let file: Option<std::path::PathBuf> = None;
             let _ = self
                 .cmd_tx
                 .send(EditorCommand::Dialog(DialogCommand::FilePickerResult {
