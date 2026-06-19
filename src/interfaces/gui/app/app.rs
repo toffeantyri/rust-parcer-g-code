@@ -327,6 +327,12 @@ impl eframe::App for GCodeApp {
                 self.handle_intent(&Intent::SaveFile);
             }
         }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::F)) {
+            self.handle_intent(&Intent::ToggleSearch);
+        }
+        if ctx.input_mut(|i| i.consume_key(egui::Modifiers::CTRL, egui::Key::H)) {
+            self.handle_intent(&Intent::ToggleReplace);
+        }
 
         // === Coalesce: отправляем TextChanged, если прошло 100 мс с последнего изменения ===
         if self.pending_text.is_some()
@@ -340,6 +346,8 @@ impl eframe::App for GCodeApp {
         all_intents.extend(view::view_settings(&self.model, ctx));
         all_intents.extend(view::view_exit_dialog(&self.model, ctx));
         all_intents.extend(view::view_shortcuts(&self.model, ctx));
+        all_intents.extend(view::view_search_dialog(&mut self.model, ctx));
+        all_intents.extend(view::view_replace_dialog(&mut self.model, ctx));
 
         // 2. Intent — обрабатываем через handle_intent
         for intent in &all_intents {

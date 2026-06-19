@@ -9,7 +9,12 @@ use crate::infrastructure::lexer::tokenize_with_positions;
 use egui::Color32;
 
 /// Строит LayoutJob с подсветкой синтаксиса для G-кода.
-pub fn build_highlighted_job(text: &str, error_lines: &[usize]) -> egui::text::LayoutJob {
+/// `search_highlight` — диапазон байтов для жёлтой подсветки поиска (start..end).
+pub fn build_highlighted_job(
+    text: &str,
+    error_lines: &[usize],
+    search_highlight: Option<(usize, usize)>,
+) -> egui::text::LayoutJob {
     let mut job = egui::text::LayoutJob::default();
     let mut tokens = tokenize_with_positions(text);
 
@@ -18,6 +23,78 @@ pub fn build_highlighted_job(text: &str, error_lines: &[usize]) -> egui::text::L
 
     let mut current_pos = 0;
     let mut current_line: usize = 1;
+
+    /// Добавляет фрагмент текста с подсветкой, разбивая на сегменты,
+    /// если часть попадает в зону поисковой подсветки.
+    fn append_with_highlight(
+        job: &mut egui::text::LayoutJob,
+        segment: &str,
+        byte_offset: usize,
+        color: Option<Color32>,
+        error_bg: Color32,
+        search_highlight: Option<(usize, usize)>,
+    ) {
+        let seg_start = byte_offset;
+        let seg_end = byte_offset + segment.len();
+
+        if let Some((sh_start, sh_end)) = search_highlight {
+            if sh_start < seg_end && sh_end > seg_start {
+                // Есть пересечение — разбиваем сегмент на до/в/после
+                let rel_sh_start = sh_start.saturating_sub(seg_start);
+                let rel_sh_end = (sh_end - seg_start).min(segment.len());
+
+                // До подсветки
+                if rel_sh_start > 0 {
+                    job.append(
+                        &segment[..rel_sh_start],
+                        0.0,
+                        egui::TextFormat {
+                            color: color.unwrap_or_default(),
+                            background: error_bg,
+                            ..Default::default()
+                        },
+                    );
+                }
+                // Подсвеченная зона — жёлтый фон
+                job.append(
+                    &segment[rel_sh_start..rel_sh_end],
+                    0.0,
+                    egui::TextFormat {
+                        color: color.unwrap_or_default(),
+                        background: blend_backgrounds(
+                            error_bg,
+                            Color32::from_rgba_premultiplied(255, 255, 0, 80),
+                        ),
+                        ..Default::default()
+                    },
+                );
+                // После подсветки
+                if rel_sh_end < segment.len() {
+                    job.append(
+                        &segment[rel_sh_end..],
+                        0.0,
+                        egui::TextFormat {
+                            color: color.unwrap_or_default(),
+                            background: error_bg,
+                            ..Default::default()
+                        },
+                    );
+                }
+                return;
+            }
+        }
+
+        // Нет пересечения — добавляем как есть
+        job.append(
+            segment,
+            0.0,
+            egui::TextFormat {
+                color: color.unwrap_or_default(),
+                background: error_bg,
+                ..Default::default()
+            },
+        );
+    }
 
     for tp in &tokens {
         // Если есть пропуск между токенами (пробелы) — добавляем их без подсветки
@@ -29,13 +106,13 @@ pub fn build_highlighted_job(text: &str, error_lines: &[usize]) -> egui::text::L
                     current_line += 1;
                 }
             }
-            job.append(
+            append_with_highlight(
+                &mut job,
                 gap,
-                0.0,
-                egui::TextFormat {
-                    background: line_bg(current_line, error_lines),
-                    ..Default::default()
-                },
+                current_pos,
+                None,
+                line_bg(current_line, error_lines),
+                search_highlight,
             );
         }
 
@@ -45,14 +122,13 @@ pub fn build_highlighted_job(text: &str, error_lines: &[usize]) -> egui::text::L
         if tp.token == Token::NewLine {
             current_line += 1;
         }
-        job.append(
+        append_with_highlight(
+            &mut job,
             token_text,
-            0.0,
-            egui::TextFormat {
-                color: token_color(&tp.token),
-                background: line_bg(current_line, error_lines),
-                ..Default::default()
-            },
+            tp.start,
+            Some(token_color(&tp.token)),
+            line_bg(current_line, error_lines),
+            search_highlight,
         );
 
         current_pos = tp.end;
@@ -61,17 +137,29 @@ pub fn build_highlighted_job(text: &str, error_lines: &[usize]) -> egui::text::L
     // Если после последнего токена есть остаток текста
     if current_pos < text.len() {
         let remaining = &text[current_pos..];
-        job.append(
+        append_with_highlight(
+            &mut job,
             remaining,
-            0.0,
-            egui::TextFormat {
-                background: line_bg(current_line, error_lines),
-                ..Default::default()
-            },
+            current_pos,
+            None,
+            line_bg(current_line, error_lines),
+            search_highlight,
         );
     }
 
     job
+}
+
+/// Смешивает два цвета фона (берёт непрозрачный, если один из них прозрачен).
+fn blend_backgrounds(a: Color32, b: Color32) -> Color32 {
+    if a == Color32::TRANSPARENT {
+        b
+    } else if b == Color32::TRANSPARENT {
+        a
+    } else {
+        // Оба не прозрачны — берём b (жёлтый) поверх a (красный ошибки)
+        b
+    }
 }
 
 /// Возвращает цвет для токена на основе его типа.

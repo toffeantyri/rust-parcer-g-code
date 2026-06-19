@@ -18,6 +18,8 @@ pub struct Locale {
     pub toolbar: ToolbarStrings,
     pub dialog: DialogStrings,
     pub settings: SettingsStrings,
+    pub search: SearchStrings,
+    pub replace: ReplaceStrings,
 }
 
 #[derive(Deserialize, Clone)]
@@ -58,6 +60,8 @@ pub struct MenuStrings {
     pub language: String,
     pub lang_ru: String,
     pub lang_en: String,
+    pub search: String,
+    pub replace: String,
 }
 
 #[derive(Deserialize, Clone)]
@@ -83,6 +87,28 @@ pub struct SettingsStrings {
     pub renumber_step: String,
     pub skip_empty: String,
     pub examples: String,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct SearchStrings {
+    pub title: String,
+    pub search_hint: String,
+    pub btn_find: String,
+    pub btn_cancel: String,
+    pub not_found: String,
+}
+
+#[derive(Deserialize, Clone)]
+pub struct ReplaceStrings {
+    pub title: String,
+    pub find_hint: String,
+    pub replace_hint: String,
+    pub btn_find: String,
+    pub btn_replace: String,
+    pub btn_replace_all: String,
+    pub btn_cancel: String,
+    pub not_found: String,
+    pub replaced: String,
 }
 
 // ---------------------------------------------------------------------------

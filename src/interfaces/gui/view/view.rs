@@ -68,6 +68,15 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &Model) -> Vec
                     ui.close_menu();
                 }
                 ui.separator();
+                if ui.button(&i18n::locale().menu.search).clicked() {
+                    intents.push(Intent::ToggleSearch);
+                    ui.close_menu();
+                }
+                if ui.button(&i18n::locale().menu.replace).clicked() {
+                    intents.push(Intent::ToggleReplace);
+                    ui.close_menu();
+                }
+                ui.separator();
                 if ui.button(&i18n::locale().menu.format_settings).clicked() {
                     intents.push(Intent::ToggleSettings);
                     ui.close_menu();
@@ -225,13 +234,27 @@ pub fn view_editor(
     pending_text: &mut Option<String>,
 ) {
     let content_before = model.content().to_string();
-    // Извлекаем String из модели для TextEdit (который требует &mut String)
     let mut edit_content = model.content().to_string();
+
+    // Вычисляем зону подсветки поиска/замены (start..end) в байтах.
+    // Приоритет: если открыт диалог замены и есть вхождения — подсвечиваем их.
+    let search_highlight = if model.replace_open() && !model.replace_matches().is_empty() {
+        let idx = model.replace_index();
+        let byte_pos = model.replace_matches().get(idx).copied().unwrap_or(0);
+        let len = model.replace_find().len();
+        Some((byte_pos, byte_pos + len))
+    } else if !model.search_matches().is_empty() {
+        let idx = model.search_index();
+        let byte_pos = model.search_matches().get(idx).copied().unwrap_or(0);
+        let len = model.search_query().len();
+        Some((byte_pos, byte_pos + len))
+    } else {
+        None
+    };
 
     egui::CentralPanel::default().show(ctx, |ui| {
         let editor_id = ui.next_auto_id();
 
-        // Если файл только что загружен — фокусируем редактор
         if model.editor_needs_focus() {
             ctx.memory_mut(|mem| mem.request_focus(editor_id));
             model.set_editor_needs_focus(false);
@@ -249,7 +272,8 @@ pub fn view_editor(
                         .desired_rows(50)
                         .font(TextStyle::Monospace)
                         .layouter(&mut |_ui: &egui::Ui, text: &str, _wrap_width: f32| {
-                            let job = build_highlighted_job(text, model.error_lines());
+                            let job =
+                                build_highlighted_job(text, model.error_lines(), search_highlight);
                             _ui.fonts(|f| f.layout_job(job))
                         }),
                 );
@@ -390,6 +414,206 @@ pub fn view_shortcuts(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
 
     if !open_copy {
         intents.push(Intent::ToggleShortcuts);
+    }
+
+    intents
+}
+
+/// Отрисовывает диалог поиска.
+pub fn view_search_dialog(model: &mut Model, ctx: &egui::Context) -> Vec<Intent> {
+    let mut intents = Vec::new();
+    if !model.search_open() {
+        return intents;
+    }
+
+    let mut open_copy = true;
+    let loc = i18n::locale();
+    egui::Window::new(&loc.search.title)
+        .open(&mut open_copy)
+        .resizable(false)
+        .collapsible(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .default_size([360.0, 130.0])
+        .show(ctx, |ui| {
+            // Поле ввода — всегда синхронизируем с моделью
+            let mut query = model.search_query().to_string();
+            let search_field_id = ui.id().with("search_input");
+            // Автофокус при открытии
+            if model.search_focus_needed() {
+                ctx.memory_mut(|mem| mem.request_focus(search_field_id));
+            }
+            let resp = ui.add_sized(
+                [ui.available_width(), 24.0],
+                egui::TextEdit::singleline(&mut query)
+                    .id(search_field_id)
+                    .hint_text(&loc.search.search_hint),
+            );
+            // Сбрасываем флаг после фокусировки
+            if resp.has_focus() && model.search_focus_needed() {
+                model.set_search_focus_needed(false);
+            }
+            // Всегда обновляем модель при расхождении (TextEdit мутирует query напрямую)
+            if query != model.search_query() {
+                intents.push(Intent::SetSearchQuery(query));
+            }
+            // Enter в поле ввода → искать/перейти к следующему.
+            // TextEdit singleline теряет фокус при нажатии Enter.
+            // lost_focus() ловит момент потери фокуса в этом кадре.
+            if resp.lost_focus() && ui.ctx().input(|i| i.key_pressed(egui::Key::Enter)) {
+                intents.push(Intent::FindNext);
+                // Возвращаем фокус обратно на поле ввода
+                model.set_search_focus_needed(true);
+            }
+            // Escape → закрыть
+            if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                intents.push(Intent::CloseSearchDialog);
+                return;
+            }
+
+            ui.add_space(8.0);
+            ui.horizontal(|ui| {
+                if ui.button(&loc.search.btn_find).clicked() {
+                    // Первый клик ищет, последующие переходят к следующему вхождению
+                    intents.push(Intent::FindNext);
+                }
+                if ui.button(&loc.search.btn_cancel).clicked() {
+                    intents.push(Intent::CloseSearchDialog);
+                }
+                // Показываем количество найденных
+                let found = model.search_matches().len();
+                if !model.search_last_query().is_empty() {
+                    if found > 0 {
+                        ui.label(format!("{} / {}", model.search_index() + 1, found));
+                    } else {
+                        ui.label(&loc.search.not_found);
+                    }
+                }
+            });
+        });
+
+    if !open_copy {
+        intents.push(Intent::CloseSearchDialog);
+    }
+
+    intents
+}
+
+/// Отрисовывает диалог замены.
+pub fn view_replace_dialog(model: &mut Model, ctx: &egui::Context) -> Vec<Intent> {
+    let mut intents = Vec::new();
+    if !model.replace_open() {
+        return intents;
+    }
+
+    let mut open_copy = true;
+    let loc = i18n::locale();
+    egui::Window::new(&loc.replace.title)
+        .open(&mut open_copy)
+        .resizable(false)
+        .collapsible(false)
+        .anchor(egui::Align2::CENTER_CENTER, [0.0, 0.0])
+        .default_size([380.0, 190.0])
+        .show(ctx, |ui| {
+            // Escape → закрыть
+            if ui.input(|i| i.key_pressed(egui::Key::Escape)) {
+                intents.push(Intent::CloseSearchDialog);
+                return;
+            }
+
+            // Поле «Найти» — всегда синхронизируем
+            let mut find = model.replace_find().to_string();
+            ui.label(&loc.replace.find_hint);
+            let find_field_id = ui.id().with("replace_find_input");
+            // Автофокус при открытии
+            if model.replace_focus_needed() {
+                ctx.memory_mut(|mem| mem.request_focus(find_field_id));
+            }
+            let _find_resp = ui.add_sized(
+                [ui.available_width(), 24.0],
+                egui::TextEdit::singleline(&mut find)
+                    .id(find_field_id)
+                    .hint_text(&loc.replace.find_hint),
+            );
+            // Сбрасываем флаг после фокусировки
+            if _find_resp.has_focus() && model.replace_focus_needed() {
+                model.set_replace_focus_needed(false);
+            }
+            if find != model.replace_find() {
+                intents.push(Intent::SetReplaceFind(find.clone()));
+            }
+            // Enter в поле «Найти» → искать/перейти к следующему
+            if _find_resp.lost_focus()
+                && !find.is_empty()
+                && ui.ctx().input(|i| i.key_pressed(egui::Key::Enter))
+            {
+                intents.push(Intent::ReplaceFindNext);
+                // Возвращаем фокус обратно на поле «Найти»
+                model.set_replace_focus_needed(true);
+            }
+
+            ui.add_space(4.0);
+
+            // Поле «Заменить на» — всегда синхронизируем
+            let mut replace_with = model.replace_with().to_string();
+            ui.label(&loc.replace.replace_hint);
+            let _replace_resp = ui.add_sized(
+                [ui.available_width(), 24.0],
+                egui::TextEdit::singleline(&mut replace_with).hint_text(&loc.replace.replace_hint),
+            );
+            if replace_with != model.replace_with() {
+                intents.push(Intent::SetReplaceWith(replace_with));
+            }
+
+            ui.add_space(8.0);
+
+            // Кнопки: Найти | Заменить | Заменить всё | Отмена
+            let can_find = !model.replace_find().is_empty();
+            // Замена недоступна, если поле «Заменить на» пустое или нет вхождений
+            let can_replace =
+                can_find && !model.replace_with().is_empty() && !model.replace_matches().is_empty();
+            // Заменить всё недоступно, если поле «Заменить на» пустое
+            let can_replace_all = can_find && !model.replace_with().is_empty();
+            ui.horizontal(|ui| {
+                if ui
+                    .add_enabled(can_find, egui::Button::new(&loc.replace.btn_find))
+                    .clicked()
+                {
+                    intents.push(Intent::ReplaceFindNext);
+                }
+                if ui
+                    .add_enabled(can_replace, egui::Button::new(&loc.replace.btn_replace))
+                    .clicked()
+                {
+                    intents.push(Intent::ReplaceOne);
+                }
+                if ui
+                    .add_enabled(
+                        can_replace_all,
+                        egui::Button::new(&loc.replace.btn_replace_all),
+                    )
+                    .clicked()
+                {
+                    intents.push(Intent::ReplaceAll);
+                }
+                if ui.button(&loc.replace.btn_cancel).clicked() {
+                    intents.push(Intent::CloseSearchDialog);
+                }
+            });
+
+            // Статус найденных
+            if !model.replace_last_find().is_empty() {
+                ui.add_space(4.0);
+                let found = model.replace_matches().len();
+                if found > 0 {
+                    ui.label(format!("{} / {}", model.replace_index() + 1, found));
+                } else {
+                    ui.label(&loc.replace.not_found);
+                }
+            }
+        });
+
+    if !open_copy {
+        intents.push(Intent::CloseSearchDialog);
     }
 
     intents

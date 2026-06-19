@@ -18,6 +18,32 @@ pub struct Model {
     save_and_exec: Option<PendingAction>,
     error_lines: Vec<usize>,
     editor_needs_focus: bool,
+    /// Поиск: открыто ли окно поиска
+    search_open: bool,
+    /// Поиск: текущая строка запроса
+    search_query: String,
+    /// Поиск: индекс текущего вхождения (от 0)
+    search_index: usize,
+    /// Поиск: позиции всех вхождений (byte offset начала)
+    search_matches: Vec<usize>,
+    /// Поиск: предыдущий поисковый запрос (для сброса при изменении)
+    search_last_query: String,
+    /// Замена: открыто ли окно замены
+    replace_open: bool,
+    /// Замена: что ищем
+    replace_find: String,
+    /// Замена: на что заменяем
+    replace_with: String,
+    /// Замена: индекс текущего вхождения
+    replace_index: usize,
+    /// Замена: позиции всех вхождений
+    replace_matches: Vec<usize>,
+    /// Замена: предыдущий запрос поиска в окне замены
+    replace_last_find: String,
+    /// Флаг: запросить фокус поля ввода поиска при следующем кадре
+    search_focus_needed: bool,
+    /// Флаг: запросить фокус поля «Найти» в диалоге замены при следующем кадре
+    replace_focus_needed: bool,
 }
 
 impl Model {
@@ -59,6 +85,45 @@ impl Model {
     }
     pub fn editor_needs_focus(&self) -> bool {
         self.editor_needs_focus
+    }
+    pub fn search_open(&self) -> bool {
+        self.search_open
+    }
+    pub fn search_query(&self) -> &str {
+        &self.search_query
+    }
+    pub fn search_index(&self) -> usize {
+        self.search_index
+    }
+    pub fn search_matches(&self) -> &[usize] {
+        &self.search_matches
+    }
+    pub fn replace_open(&self) -> bool {
+        self.replace_open
+    }
+    pub fn replace_find(&self) -> &str {
+        &self.replace_find
+    }
+    pub fn replace_with(&self) -> &str {
+        &self.replace_with
+    }
+    pub fn replace_index(&self) -> usize {
+        self.replace_index
+    }
+    pub fn replace_matches(&self) -> &[usize] {
+        &self.replace_matches
+    }
+    pub fn search_last_query(&self) -> &str {
+        &self.search_last_query
+    }
+    pub fn replace_last_find(&self) -> &str {
+        &self.replace_last_find
+    }
+    pub fn search_focus_needed(&self) -> bool {
+        self.search_focus_needed
+    }
+    pub fn replace_focus_needed(&self) -> bool {
+        self.replace_focus_needed
     }
 }
 
@@ -104,6 +169,45 @@ impl Model {
     }
     pub fn set_editor_needs_focus(&mut self, v: bool) {
         self.editor_needs_focus = v;
+    }
+    pub fn set_search_open(&mut self, v: bool) {
+        self.search_open = v;
+    }
+    pub fn set_search_query(&mut self, v: String) {
+        self.search_query = v;
+    }
+    pub fn set_search_index(&mut self, v: usize) {
+        self.search_index = v;
+    }
+    pub fn set_search_matches(&mut self, v: Vec<usize>) {
+        self.search_matches = v;
+    }
+    pub fn set_search_last_query(&mut self, v: String) {
+        self.search_last_query = v;
+    }
+    pub fn set_replace_open(&mut self, v: bool) {
+        self.replace_open = v;
+    }
+    pub fn set_replace_find(&mut self, v: String) {
+        self.replace_find = v;
+    }
+    pub fn set_replace_with(&mut self, v: String) {
+        self.replace_with = v;
+    }
+    pub fn set_replace_index(&mut self, v: usize) {
+        self.replace_index = v;
+    }
+    pub fn set_replace_matches(&mut self, v: Vec<usize>) {
+        self.replace_matches = v;
+    }
+    pub fn set_replace_last_find(&mut self, v: String) {
+        self.replace_last_find = v;
+    }
+    pub fn set_search_focus_needed(&mut self, v: bool) {
+        self.search_focus_needed = v;
+    }
+    pub fn set_replace_focus_needed(&mut self, v: bool) {
+        self.replace_focus_needed = v;
     }
 }
 

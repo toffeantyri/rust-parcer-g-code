@@ -5,5 +5,6 @@
 mod view;
 
 pub use view::{
-    collect_intents, view_editor, view_exit_dialog, view_settings, view_shortcuts, view_statusbar,
+    collect_intents, view_editor, view_exit_dialog, view_replace_dialog, view_search_dialog,
+    view_settings, view_shortcuts, view_statusbar,
 };

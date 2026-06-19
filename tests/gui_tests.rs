@@ -8,8 +8,8 @@ use egui_kittest::{kittest::Queryable, Harness};
 
 use code_parser::data_layer::{EditorEvent, PipelineEvent};
 use code_parser::interfaces::gui::{
-    collect_intents, view_editor, view_exit_dialog, view_settings, view_shortcuts, view_statusbar,
-    FormatSettings, Model,
+    collect_intents, view_editor, view_exit_dialog, view_search_dialog, view_settings,
+    view_shortcuts, view_statusbar, FormatSettings, Intent, Model,
 };
 use code_parser::shared::i18n;
 use code_parser::shared::ValidationMessage;
@@ -489,4 +489,103 @@ fn test_exit_dialog_escape_closes() {
     // т.к. intents собирается внутри closure)
     // Проверяем хотя бы что диалог отрисовался
     assert!(harness.query_by_label("Cancel").is_some());
+}
+
+// ---------------------------------------------------------------------------
+// Search dialog
+// ---------------------------------------------------------------------------
+
+#[test]
+fn test_search_dialog_shows_when_open() {
+    let _lock = with_i18n_lock();
+    i18n::set_lang("en");
+    let mut model = Model::default();
+    model.set_search_open(true);
+
+    let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
+        let _intents = view_search_dialog(&mut model, ui.ctx());
+    });
+    harness.run();
+
+    // Диалог виден — проверяем по содержимому
+    assert!(harness.query_by_label("Search").is_some());
+    assert!(harness.query_by_label("Find").is_some());
+    assert!(harness.query_by_label("Cancel").is_some());
+}
+
+#[test]
+fn test_search_dialog_not_shown_by_default() {
+    let _lock = with_i18n_lock();
+    i18n::set_lang("en");
+    let mut model = Model::default();
+
+    let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
+        let _intents = view_search_dialog(&mut model, ui.ctx());
+    });
+    harness.run();
+
+    assert!(harness.query_by_label("Search").is_none());
+}
+
+#[test]
+fn test_search_dialog_enter_autofocus_works() {
+    let _lock = with_i18n_lock();
+    i18n::set_lang("en");
+    let mut model = Model::default();
+    model.set_content("G0 X10 Y20".to_string());
+    model.set_search_open(true);
+    model.set_search_query("G0".to_string());
+    model.set_search_focus_needed(true);
+
+    let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
+        let _intents = view_search_dialog(&mut model, ui.ctx());
+    });
+    harness.run();
+
+    // Поле ввода должно быть видно
+    let input = harness.query_by_role(Role::TextInput);
+    assert!(input.is_some(), "Поле ввода поиска должно быть в диалоге");
+}
+
+#[test]
+fn test_search_dialog_escape_closes_via_intent() {
+    let _lock = with_i18n_lock();
+    i18n::set_lang("en");
+    let mut model = Model::default();
+    model.set_search_open(true);
+    model.set_search_query("G0".to_string());
+
+    // Имитируем обработку Escape вручную через Model::apply
+    // (Harness не позволяет собрать intents из-за move в замыкание)
+    model.apply(&Intent::CloseSearchDialog);
+    assert!(
+        !model.search_open(),
+        "CloseSearchDialog должен закрыть диалог"
+    );
+    assert!(model.search_query().is_empty());
+}
+
+#[test]
+fn test_search_dialog_find_button_click_via_model() {
+    let _lock = with_i18n_lock();
+    i18n::set_lang("en");
+    let mut model = Model::default();
+    model.set_content("G0 X10 Y20\nG0 Z30".to_string());
+    model.set_search_open(true);
+    model.set_search_query("G0".to_string());
+
+    // Имитируем клик Find (→ FindNext)
+    model.apply(&Intent::FindNext);
+
+    // После первого FindNext должен быть пересчёт
+    assert_eq!(model.search_matches().len(), 2);
+    assert_eq!(model.search_index(), 0);
+
+    // Второй клик — перейти к следующему
+    model.apply(&Intent::FindNext);
+    assert_eq!(model.search_index(), 1);
+
+    // Третий — цикл
+    model.apply(&Intent::FindNext);
+    assert_eq!(model.search_index(), 0);
 }
