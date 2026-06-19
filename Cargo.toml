@@ -5,31 +5,48 @@ edition = "2021"
 
 description = "A parser and formatter library in Rust"
 
+[features]
+android = []  # feature-флаг для Android-сборки
+
 [lib]
 name = "code_parser"
 
 [[bin]]
 name = "editor"
-path = "src/bin/gui_main.rs"
+path = "src/bin/desktop_main.rs"
 
 [[bin]]
 name = "debug-tokens"
 path = "src/bin/cli_debug.rs"
 
+# Android APK (собирается только под Android)
+# cargo apk build --bin android
+[[bin]]
+name = "android"
+path = "src/bin/android_main.rs"
+required-features = ["android"]
+
 [dependencies]
 thiserror = "2.0"
 logos = "0.14"
+
 rfd = "0.15"
 
 # GUI — wgpu + glow (wgpu основной исправляет баг glutin/wgl на Windows)
 # default-features = false выключает x11/wayland, поэтому добавляем явно
 eframe = { version = "0.31", default-features = false, features = ["default", "glow", "wgpu", "x11"] }
 egui = "0.31"
+egui_glow = "0.31"
 
 # Сериализация настроек
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.9"
+
+# Android (не собирается на десктопе)
+[target.'cfg(target_os = "android")'.dependencies]
+android-activity = { version = "0.6", features = ["native-activity"] }
+android_logger = "0.14"
 
 [build-dependencies]
 

@@ -1,0 +1,29 @@
+{
+  "android": {
+    "package": "com.gcode.editor",
+    "version": "0.2.1",
+    "display_name": "G-Code Editor",
+    "activity": {
+      "name": "android.app.NativeActivity",
+      "config_changes": "orientation|keyboardHidden|screenSize|smallestScreenSize|screenLayout|screenSize|density",
+      "launch_mode": "singleTask",
+      "orientation": "unspecified",
+      "software_keyboard": {
+        "input_mode": "adjustResize"
+      }
+    },
+    "features": [
+      {
+        "name": "android.hardware.touchscreen",
+        "required": true
+      },
+      {
+        "name": "android.software.leanback",
+        "required": false
+      }
+    ],
+    "min_sdk_version": 26,
+    "target_sdk_version": 34,
+    "max_sdk_version": 36
+  }
+}

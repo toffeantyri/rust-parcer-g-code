@@ -12,6 +12,7 @@ use crate::data_layer::{
 use crate::interfaces::gui::model::PendingAction;
 use crate::shared::i18n;
 
+use crate::infrastructure::platform;
 use crate::interfaces::gui::intent::Intent;
 use crate::interfaces::gui::model::Model;
 use crate::interfaces::gui::view;
@@ -386,7 +387,7 @@ impl eframe::App for GCodeApp {
         // 4. Если data layer запрашивает file picker — показываем его
         if self.awaiting_picker {
             self.awaiting_picker = false;
-            let file = rfd::FileDialog::new().pick_file();
+            let file = platform::pick_file();
             let _ = self
                 .cmd_tx
                 .send(EditorCommand::Dialog(DialogCommand::FilePickerResult {
@@ -396,7 +397,7 @@ impl eframe::App for GCodeApp {
         }
         if self.awaiting_save_picker {
             self.awaiting_save_picker = false;
-            let file = rfd::FileDialog::new().save_file();
+            let file = platform::save_file();
             let _ = self
                 .cmd_tx
                 .send(EditorCommand::Dialog(DialogCommand::FilePickerResult {
@@ -413,5 +414,5 @@ impl eframe::App for GCodeApp {
 }
 
 #[cfg(test)]
-#[path = "app_tests.rs"]
+#[path = "desktop_tests.rs"]
 mod tests;
