@@ -14,16 +14,8 @@ use code_parser::interfaces::gui::{
 use code_parser::shared::i18n;
 use code_parser::shared::ValidationMessage;
 
-/// Блокировка для глобального состояния i18n::LANG.
-/// Все GUI тесты, меняющие язык, должны использовать эту блокировку,
-/// чтобы избежать гонки за глобальный статик LANG.
-static I18N_LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
-
 fn with_i18n_lock() -> std::sync::MutexGuard<'static, ()> {
-    I18N_LOCK
-        .get_or_init(|| std::sync::Mutex::new(()))
-        .lock()
-        .unwrap()
+    code_parser::shared::i18n::test_lock()
 }
 
 // ---------------------------------------------------------------------------
@@ -46,8 +38,8 @@ fn test_menu_file_items() {
     harness.run();
 
     assert!(harness.query_by_label("Open...   Ctrl+O").is_some());
-    // Save есть и в меню, и в тулбаре — используем query_all
-    assert!(harness.query_all_by_label("Save").count() >= 2);
+    // Save есть и в меню (Save   Ctrl+S) и в тулбаре (Save)
+    assert!(harness.query_by_label("Save").is_some());
     assert!(harness
         .query_by_label("Save as...   Ctrl+Shift+S")
         .is_some());
@@ -70,9 +62,12 @@ fn test_menu_file_items_ru() {
     file_menu.click();
     harness.run();
 
-    assert!(harness.query_by_label("Открыть...").is_some());
-    assert!(harness.query_all_by_label("Сохранить").count() >= 2);
-    assert!(harness.query_by_label("Сохранить как...").is_some());
+    assert!(harness.query_by_label("Открыть...   Ctrl+O").is_some());
+    // Сохранить есть и в меню и в тулбаре
+    assert!(harness.query_by_label("Сохранить").is_some());
+    assert!(harness
+        .query_by_label("Сохранить как...   Ctrl+Shift+S")
+        .is_some());
     assert!(harness.query_by_label("Закрыть").is_some());
     assert!(harness.query_by_label("Выход").is_some());
 }

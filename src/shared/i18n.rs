@@ -180,6 +180,13 @@ pub fn fmt_saved(path: &str) -> String {
     locale().status.saved_as.replace("{path}", path)
 }
 
+/// Блокировка для глобального LANG. Используется в тестах.
+#[doc(hidden)]
+pub fn test_lock() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    LOCK.lock().unwrap()
+}
+
 #[cfg(test)]
 #[path = "i18n_tests.rs"]
 mod tests;

@@ -1,13 +1,10 @@
 use crate::interfaces::gui::intent::Intent;
 use crate::interfaces::gui::model::{Model, PendingAction};
+use crate::shared::i18n;
 
 /// Блокировка для глобального состояния i18n::LANG.
-/// Все тесты, меняющие язык, должны использовать эту блокировку.
 fn with_i18n_lock() -> std::sync::MutexGuard<'static, ()> {
-    static LOCK: std::sync::OnceLock<std::sync::Mutex<()>> = std::sync::OnceLock::new();
-    LOCK.get_or_init(|| std::sync::Mutex::new(()))
-        .lock()
-        .unwrap()
+    i18n::test_lock()
 }
 
 fn make_model() -> Model {
