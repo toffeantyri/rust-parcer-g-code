@@ -97,6 +97,7 @@ src/
 - **Замена текста (Ctrl+H)** — пошаговая замена с навигацией или замена всех вхождений
 - **Замена осей** — поменять две оси местами (Swap) или инвертировать знак выбранной оси (Invert), включая AxisExpr с выражениями и R-параметрами
 - **Поддержка управляющих конструкций** — WHILE/ENDWHILE, IF/ELSE/ENDIF, REPEAT/UNTIL, FOR/ENDFOR, LOOP/ENDLOOP с автоматическими отступами
+- **Android** — сборка APK, Drawer-меню, затемнение фона, DPI-aware (520dpi), lifecycle (сворачивание/разворачивание, Back)
 - **Двуязычный интерфейс** — русский и английский, переключение на лету
 - **Горячие клавиши** — F5, F6, Ctrl+O, Ctrl+S, Ctrl+Shift+S, Ctrl+F, Ctrl+H
 
@@ -142,13 +143,14 @@ x run --features android --device adb:<device_id>
 ## Разработка
 
 ```sh
-cargo build --bin editor --features desktop   # Сборка десктоп
-cargo test                                    # Тесты (323 lib + 26 gui = 349)
-cargo run --bin editor --features desktop       # Запуск GUI
+cargo build --bin editor --features desktop        # Сборка десктоп
+cargo test --features desktop                      # Тесты (lib + gui = 26)
+cargo test --features desktop --test gui_tests     # Только GUI-тесты
+cargo run --bin editor --features desktop          # Запуск GUI
 
 # Android
-x build --features android --format apk         # Сборка APK
-x run --features android --device adb:<id>      # Запуск на устройстве
+ANDROID_HOME=$HOME/android-sdk x build --platform android --arch arm64 --features android --format apk   # Сборка APK
+ANDROID_HOME=$HOME/android-sdk x run --features android --device adb:<id>                                # Запуск на устройстве
 ```
 
 ### Архитектура
@@ -162,10 +164,10 @@ src/
 ├── interfaces/      # GUI на egui (MVI: Model-View-Intent)
 │   └── gui/
 │       ├── app/     # desktop.rs (eframe) / android.rs (android-activity)
-│       ├── view/    # view_desktop.rs / view_android.rs
+│       ├── view/    # view_desktop.rs / view_android.rs (+ тесты)
 │       ├── model/   # Общая модель (переиспользуется)
 │       ├── intent/  # Общие интенты
-│       └── update/  # Общая логика
+│       └── update/  # Общая логика (+ тесты)
 ├── data_layer/      # Отдельный поток (пайплайн: лексер→парсер→валидатор→форматтер)
 └── shared/          # Утилиты, локализация (i18n), типы ошибок (thiserror)
 ```
@@ -185,6 +187,7 @@ A G-code editor, formatter and validator for CNC machines with a graphical inter
 - **Text replace (Ctrl+H)** — step-by-step replace with navigation or replace all
 - **Axis swap** — swap two axes or invert sign of selected axis, including AxisExpr with expressions and R-parameters
 - **Control structures** — WHILE/ENDWHILE, IF/ELSE/ENDIF, REPEAT/UNTIL, FOR/ENDFOR, LOOP/ENDLOOP with auto-indentation
+- **Android** — APK build, Drawer menu, dark overlay, DPI-aware (520dpi), lifecycle (pause/resume, Back)
 - **Bilingual UI** — Russian and English, on-the-fly switching
 - **Keyboard shortcuts** — F5, F6, Ctrl+O, Ctrl+S, Ctrl+Shift+S, Ctrl+F, Ctrl+H
 
@@ -229,13 +232,14 @@ x run --features android --device adb:<device_id>
 ## Development
 
 ```sh
-cargo build --bin editor --features desktop   # Build desktop
-cargo test                                    # Tests (323 lib + 26 gui = 349)
-cargo run --bin editor --features desktop       # Run GUI
+cargo build --bin editor --features desktop        # Build desktop
+cargo test --features desktop                      # Tests (lib + gui = 26)
+cargo test --features desktop --test gui_tests     # GUI tests only
+cargo run --bin editor --features desktop          # Run GUI
 
 # Android
-x build --features android --format apk         # Build APK
-x run --features android --device adb:<id>      # Run on device
+ANDROID_HOME=$HOME/android-sdk x build --platform android --arch arm64 --features android --format apk   # Build APK
+ANDROID_HOME=$HOME/android-sdk x run --features android --device adb:<id>                                # Run on device
 ```
 
 ### Architecture
@@ -249,10 +253,10 @@ src/
 ├── interfaces/      # egui GUI (MVI: Model-View-Intent)
 │   └── gui/
 │       ├── app/     # desktop.rs (eframe) / android.rs (android-activity)
-│       ├── view/    # view_desktop.rs / view_android.rs
+│       ├── view/    # view_desktop.rs / view_android.rs (+ tests)
 │       ├── model/   # Shared model (reused across platforms)
 │       ├── intent/  # Shared intents
-│       └── update/  # Shared logic
+│       └── update/  # Shared logic (+ tests)
 ├── data_layer/      # Separate thread (pipeline: lexer→parser→validator→formatter)
 └── shared/          # Utilities, localization (i18n), error types (thiserror)
 ```

@@ -180,11 +180,19 @@ main thread (egui UI)
 ## Android
 - Точка входа: `#[no_mangle] fn android_main(app: AndroidApp)` в `src/lib.rs`.
 - `ANativeActivity_onCreate` генерируется крейтом `android-activity` (feature `native-activity`).
-- Сборка: `x run --features android --device adb:<id>` (требует Java JDK 21+, LLVM/clang, Rust target `aarch64-linux-android`).
-- Feature-гейтинг: `desktop` feature включает `eframe`/`rfd`, `android` feature включает `android-activity`.
-- Десктопная сборка: `cargo run --bin editor --features desktop`. Android: `--features android` (без desktop).
-- `egui`/`egui_glow` — общие зависимости, работают на обеих платформах.
-- UI на Android пока заглушка (`view_android.rs`), рендеринг через `egui_glow` будет добавлен.
+- Сборка: `ANDROID_HOME=$HOME/android-sdk x build --platform android --arch arm64 --features android --format apk`
+- Запуск: `ANDROID_HOME=$HOME/android-sdk x run --features android --device adb:<id>`
+- Требования: Java JDK 21+, LLVM/clang, Rust target `aarch64-linux-android`, `xbuild`, stub-библиотеки `~/android-ndk-stub/`.
+- Feature-гейтинг: `desktop` → eframe/rfd/egui_kittest, `android` → egui_glow/glow/android-activity.
+- Платформенные модули (`platform/`, `app/`, `view/`) выбираются через `cfg(feature = "desktop")`, не через `target_os`.
+- `view_android.rs`: полноценный UI (Drawer, бургер, overlay, диалоги), не заглушка.
+- Lifecycle: при `Stop` не выходим, при `Resume`→`InitWindow` пересоздаём только EGL surface (display/context живы).
+  При `Destroy` → `std::process::exit(0)` для полного перезапуска.
+- Тач-ивенты: MotionAction (Down/Up/Move/PointerDown/PointerUp) → `egui::Event::PointerButton` / `PointerMoved`.
+- Статус-бар: `top_inset = 45dp`, навигация (Home/Back): `bottom_inset = 48dp`. DPI: `pixels_per_point = 3.25`.
+- Тесты: `cargo test --features desktop` (26 тестов: lib + gui).
+- UI-тесты (`gui_tests.rs`) используют `egui_kittest` (только desktop feature).
+- Модель и update-логика общие для обеих платформ.
 
 ## Пример ожидаемого ответа
 [План действий]: Создам сущность пользователя в domain слое
