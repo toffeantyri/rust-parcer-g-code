@@ -58,6 +58,39 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &mut Model) ->
 
     // Drawer — боковая панель, читаем актуальное состояние из модели
     if model.flag_drawer_open() {
+        // Затемнение фона при открытом дровере.
+        let screen_rect = ctx.screen_rect();
+        let overlay_rect = egui::Rect::from_two_pos(
+            screen_rect.left_top() + egui::vec2(260.0, 0.0),
+            screen_rect.right_bottom(),
+        );
+        // Рисуем затемнение поверх всего
+        egui::Area::new("drawer_overlay".into())
+            .fixed_pos(egui::Pos2::ZERO)
+            .order(egui::Order::Foreground)
+            .interactable(true)
+            .show(ctx, |ui| {
+                let resp = ui.allocate_rect(overlay_rect, egui::Sense::click());
+                ui.painter()
+                    .rect_filled(overlay_rect, 0.0, egui::Color32::from_black_alpha(100));
+                if resp.clicked() || resp.hovered() {
+                    // Если overlay зарегил клик или просто наведение — значит тач был вне дровера.
+                    // clicked() + проверка что overlay hovered = клик вне дровера.
+                }
+            });
+        // Если был тач вне панели дровера — закрываем.
+        // Проверяем что тач был правее 260px (ширина SidePanel).
+        // Используем pressed для немедленной реакции.
+        if ctx.input(|i| i.pointer.any_pressed()) {
+            let pressed_pos = ctx.input(|i| i.pointer.interact_pos());
+            if let Some(pos) = pressed_pos {
+                if pos.x > 260.0 {
+                    model.set_drawer_open(false);
+                    ctx.request_repaint();
+                }
+            }
+        }
+
         egui::SidePanel::left("drawer")
             .resizable(false)
             .default_width(260.0)
