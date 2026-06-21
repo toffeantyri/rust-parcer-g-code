@@ -33,6 +33,23 @@ mod android {
     use crate::data_layer::spawn_data_layer;
     use crate::interfaces::gui::GCodeApp;
 
+    /// Безопасно уничтожает EGL ресурсы и egui painter.
+    fn destroy_egl(
+        egui_painter: &mut Option<egui_glow::Painter>,
+        egl_surface: &mut Option<glutin::surface::Surface<glutin::surface::WindowSurface>>,
+        egl_context: &mut Option<glutin::context::PossiblyCurrentContext>,
+        egl_display: &mut Option<glutin::display::Display>,
+    ) {
+        if let Some(ref mut p) = egui_painter {
+            log::info!("destroy_egl: destroying painter");
+            p.destroy();
+        }
+        *egui_painter = None;
+        *egl_surface = None;
+        *egl_context = None;
+        *egl_display = None;
+    }
+
     #[no_mangle]
     pub fn android_main(app: AndroidApp) {
         android_logger::init_once(
@@ -72,19 +89,85 @@ mod android {
                 PollEvent::Wake | PollEvent::Timeout => {}
                 PollEvent::Main(e) => match e {
                     MainEvent::InitWindow { .. } => {
-                        log::info!("Lifecycle: InitWindow");
-                        native_window = app.native_window();
+                        let nw = app.native_window();
+                        log::info!("Lifecycle: InitWindow (nw={:?})", nw.is_some());
+                        needs_redraw = true;
+                        if let Some(ref new_nw) = nw {
+                            log::info!("InitWindow: size {}x{}", new_nw.width(), new_nw.height());
+                            // Если уже был display — пересоздаём только surface для нового окна
+                            if let Some(ref dpy) = egl_display {
+                                log::info!("InitWindow: reusing EGL display, creating new surface");
+                                // Уничтожаем старый surface (если был)
+                                egl_surface = None;
+                                // Создаём новый surface
+                                let config = unsafe {
+                                    dpy.find_configs(
+                                        glutin::config::ConfigTemplateBuilder::new().build(),
+                                    )
+                                    .unwrap()
+                                    .next()
+                                    .unwrap()
+                                };
+                                let new_surface = unsafe {
+                                    dpy.create_window_surface(
+                                        &config,
+                                        &glutin::surface::SurfaceAttributesBuilder::<
+                                            glutin::surface::WindowSurface,
+                                        >::new()
+                                        .build(
+                                            new_nw.raw_window_handle(),
+                                            std::num::NonZeroU32::new(
+                                                (new_nw.width() as u32).max(1),
+                                            )
+                                            .unwrap(),
+                                            std::num::NonZeroU32::new(
+                                                (new_nw.height() as u32).max(1),
+                                            )
+                                            .unwrap(),
+                                        ),
+                                    )
+                                };
+                                match new_surface {
+                                    Ok(surf) => {
+                                        // Перепривязываем контекст к новому surface
+                                        if let Some(ref ctx) = egl_context {
+                                            if let Err(e) = ctx.make_current(&surf) {
+                                                log::warn!("make_current error: {:?}", e);
+                                            }
+                                        }
+                                        egl_surface = Some(surf);
+                                        log::info!("InitWindow: new EGL surface created");
+                                    }
+                                    Err(e) => {
+                                        log::error!("create_window_surface error: {:?}", e);
+                                        // Не удалось — сбросим всё и создадим заново на след. InitWindow
+                                        destroy_egl(
+                                            &mut egui_painter,
+                                            &mut egl_surface,
+                                            &mut egl_context,
+                                            &mut egl_display,
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                        native_window = nw;
+                    }
+                    MainEvent::Resume { .. } => {
+                        log::info!("Lifecycle: Resume");
                         needs_redraw = true;
                     }
-                    MainEvent::Resume { .. } => log::info!("Lifecycle: Resume"),
                     MainEvent::Pause { .. } => log::info!("Lifecycle: Pause"),
                     MainEvent::Stop { .. } => {
-                        log::info!("Lifecycle: Stop — exiting");
-                        return;
+                        log::info!("Lifecycle: Stop — staying alive");
+                        // Не выходим — Activity может вернуться (Resume → InitWindow).
+                        // При Stop просто ждём.
                     }
                     MainEvent::Destroy { .. } => {
-                        log::info!("Lifecycle: Destroy — exiting");
-                        return;
+                        log::info!("Lifecycle: Destroy — exiting process");
+                        // При Destroy завершаем процесс полностью — система загрузит native код заново.
+                        // Используем exit чтобы не зависнуть на unloadNativeCode.
+                        std::process::exit(0);
                     }
                     MainEvent::RedrawNeeded { .. } => {
                         needs_redraw = true;
@@ -154,7 +237,11 @@ mod android {
             // Инициализация EGL + egui при получении окна
             if egl_display.is_none() && native_window.is_some() {
                 let nw = native_window.as_ref().unwrap();
-                log::info!("Initializing EGL + egui...");
+                log::info!(
+                    "Initializing EGL + egui... egl_display=None, nw_size={}x{}",
+                    nw.width(),
+                    nw.height()
+                );
 
                 // Создаём EGL display через glutin (Android использует EGL по умолчанию)
                 let display = unsafe {
@@ -228,7 +315,19 @@ mod android {
                                                 );
 
                                                 match painter {
-                                                    Ok(painter) => {
+                                                    Ok(mut painter) => {
+                                                        // Принудительно сбрасываем все текстуры в GL —
+                                                        // после пересоздания контекста старые невалидны.
+                                                        unsafe {
+                                                            use glow::HasContext;
+                                                            let gl_ctx = painter.gl();
+                                                            gl_ctx.clear_color(0.0, 0.0, 0.0, 0.0);
+                                                            gl_ctx.clear(glow::COLOR_BUFFER_BIT);
+                                                        }
+                                                        // Перезагружаем шрифты в новом GL контексте.
+                                                        egui_ctx.set_fonts(
+                                                            egui::FontDefinitions::default(),
+                                                        );
                                                         egl_display = Some(dpy);
                                                         egl_surface = Some(surface);
                                                         egl_context = Some(ctx);
@@ -271,6 +370,18 @@ mod android {
             if needs_redraw && now.duration_since(last_frame) >= Duration::from_millis(16) {
                 needs_redraw = false;
                 last_frame = now;
+
+                let has_painter = egui_painter.is_some();
+                let has_surface = egl_surface.is_some();
+                let has_ctx = egl_context.is_some();
+                if !(has_painter && has_surface && has_ctx) {
+                    log::info!(
+                        "Skipping frame: painter={}, surface={}, ctx={}",
+                        has_painter,
+                        has_surface,
+                        has_ctx
+                    );
+                }
 
                 if let (Some(ref mut painter), Some(ref surface), Some(ref ctx)) =
                     (&mut egui_painter, &egl_surface, &egl_context)
