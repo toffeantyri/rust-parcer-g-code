@@ -20,9 +20,8 @@ use crate::interfaces::gui::model::Model;
 
 /// Собирает намерения от UI: Drawer (боковое меню) для Android.
 /// На телефоне узкий экран — всё управление через бургер-меню слева.
-pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &Model) -> Vec<Intent> {
+pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &mut Model) -> Vec<Intent> {
     let mut intents = Vec::new();
-    let drawer_open = model.flag_drawer_open();
 
     // Верхняя панель — только бургер и имя файла (минимально)
     egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
@@ -32,7 +31,9 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &Model) -> Vec
             let btn = egui::Button::new("☰").min_size(egui::vec2(40.0, 40.0));
             let resp = ui.add(btn);
             if resp.clicked() {
-                intents.push(Intent::ToggleDrawer);
+                // Меняем drawer_open немедленно, чтобы SidePanel показалась на этом же кадре
+                let new_state = !model.flag_drawer_open();
+                model.set_drawer_open(new_state);
             }
 
             // Имя файла (если есть)
@@ -55,8 +56,8 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &Model) -> Vec
         });
     });
 
-    // Drawer — боковая панель, показывается по бургеру
-    if drawer_open {
+    // Drawer — боковая панель, читаем актуальное состояние из модели
+    if model.flag_drawer_open() {
         egui::SidePanel::left("drawer")
             .resizable(false)
             .default_width(260.0)

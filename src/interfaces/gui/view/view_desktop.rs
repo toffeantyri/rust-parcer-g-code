@@ -15,7 +15,7 @@ use crate::interfaces::gui::intent::{AxisSwapMode, Intent};
 use crate::interfaces::gui::model::Model;
 
 /// Собирает намерения от UI: меню + панель инструментов.
-pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &Model) -> Vec<Intent> {
+pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &mut Model) -> Vec<Intent> {
     let mut intents = Vec::new();
 
     egui::TopBottomPanel::top("menu_panel").show(ctx, |ui| {

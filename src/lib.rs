@@ -301,7 +301,8 @@ mod android {
                         let is_busy = gcode_app.model.is_busy();
 
                         // 1. View → Intent: собираем намерения от UI
-                        let mut all_intents = view::collect_intents(ctx, is_busy, &gcode_app.model);
+                        let mut all_intents =
+                            view::collect_intents(ctx, is_busy, &mut gcode_app.model);
                         all_intents.extend(view::view_settings(&gcode_app.model, ctx));
                         all_intents.extend(view::view_exit_dialog(&gcode_app.model, ctx));
                         all_intents.extend(view::view_shortcuts(&gcode_app.model, ctx));
