@@ -21,7 +21,10 @@ mod android {
     use std::sync::Arc;
     use std::time::{Duration, Instant};
 
-    use android_activity::{AndroidApp, MainEvent, PollEvent};
+    use android_activity::{
+        input::{InputEvent, MotionAction},
+        AndroidApp, InputStatus, MainEvent, PollEvent,
+    };
     use glutin::display::GlDisplay;
     use glutin::prelude::GlSurface;
     use glutin::prelude::*;
@@ -52,8 +55,18 @@ mod android {
             None;
         let mut egl_context: Option<glutin::context::PossiblyCurrentContext> = None;
 
+        // Состояние для редактирования
+        let mut last_text_change = Instant::now();
+        let mut pending_text: Option<String> = None;
+
+        // Для проброса тач-событий в egui: накапливаем события pointer
+        let mut pointer_events: Vec<egui::Event> = Vec::new();
+        let mut pointer_pos: Option<egui::Pos2> = None;
+        let mut last_touch_down = false;
+
         loop {
             let mut native_window: Option<ndk::native_window::NativeWindow> = None;
+            pointer_events.clear();
 
             app.poll_events(None, |event| match event {
                 PollEvent::Wake | PollEvent::Timeout => {}
@@ -81,6 +94,63 @@ mod android {
                 _ => {}
             });
 
+            // Пробрасываем тач-события в egui. Читаем InputQueue на каждом кадре.
+            if egl_display.is_some() {
+                if let Ok(mut iter) = app.input_events_iter() {
+                    let pp = egui_ctx.pixels_per_point();
+                    loop {
+                        let has = iter.next(|event| match event {
+                            android_activity::input::InputEvent::MotionEvent(motion) => {
+                                let action = motion.action();
+                                let pointer = motion.pointers().next();
+                                match (action, pointer) {
+                                    (android_activity::input::MotionAction::Down, Some(p))
+                                    | (
+                                        android_activity::input::MotionAction::PointerDown,
+                                        Some(p),
+                                    ) => {
+                                        let pos = egui::pos2(p.x() / pp, p.y() / pp);
+                                        pointer_pos = Some(pos);
+                                        pointer_events.push(egui::Event::PointerButton {
+                                            pos,
+                                            button: egui::PointerButton::Primary,
+                                            pressed: true,
+                                            modifiers: egui::Modifiers::default(),
+                                        });
+                                        android_activity::InputStatus::Handled
+                                    }
+                                    (android_activity::input::MotionAction::Up, _)
+                                    | (android_activity::input::MotionAction::PointerUp, _)
+                                    | (android_activity::input::MotionAction::Cancel, _) => {
+                                        if let Some(pos) = pointer_pos {
+                                            pointer_events.push(egui::Event::PointerButton {
+                                                pos,
+                                                button: egui::PointerButton::Primary,
+                                                pressed: false,
+                                                modifiers: egui::Modifiers::default(),
+                                            });
+                                        }
+                                        pointer_pos = None;
+                                        android_activity::InputStatus::Handled
+                                    }
+                                    (android_activity::input::MotionAction::Move, Some(p)) => {
+                                        let pos = egui::pos2(p.x() / pp, p.y() / pp);
+                                        pointer_pos = Some(pos);
+                                        pointer_events.push(egui::Event::PointerMoved(pos));
+                                        android_activity::InputStatus::Handled
+                                    }
+                                    _ => android_activity::InputStatus::Unhandled,
+                                }
+                            }
+                            _ => android_activity::InputStatus::Unhandled,
+                        });
+                        if !has {
+                            break;
+                        }
+                    }
+                }
+            }
+
             // Инициализация EGL + egui при получении окна
             if egl_display.is_none() && native_window.is_some() {
                 let nw = native_window.as_ref().unwrap();
@@ -105,6 +175,10 @@ mod android {
                                 .unwrap()
                         };
 
+                        let nw_width = nw.width() as u32;
+                        let nw_height = nw.height() as u32;
+                        log::info!("Window size: {}x{}", nw_width, nw_height);
+
                         let surface = unsafe {
                             dpy.create_window_surface(
                                 &config,
@@ -113,8 +187,8 @@ mod android {
                                 >::new()
                                 .build(
                                     nw.raw_window_handle(),
-                                    std::num::NonZeroU32::new(800).unwrap(),
-                                    std::num::NonZeroU32::new(600).unwrap(),
+                                    std::num::NonZeroU32::new(nw_width.max(1)).unwrap(),
+                                    std::num::NonZeroU32::new(nw_height.max(1)).unwrap(),
                                 ),
                             )
                         };
@@ -191,6 +265,8 @@ mod android {
                 needs_redraw = true;
             }
 
+            // Всегда запрашиваем repaint пока приложение активно (для анимаций, спиннера, UI)
+            needs_redraw = true;
             let now = Instant::now();
             if needs_redraw && now.duration_since(last_frame) >= Duration::from_millis(16) {
                 needs_redraw = false;
@@ -199,24 +275,59 @@ mod android {
                 if let (Some(ref mut painter), Some(ref surface), Some(ref ctx)) =
                     (&mut egui_painter, &egl_surface, &egl_context)
                 {
-                    let raw_input = egui::RawInput::default();
+                    let (screen_w, screen_h) = app
+                        .native_window()
+                        .map(|nw| (nw.width() as f32, nw.height() as f32))
+                        .unwrap_or((1280.0, 720.0));
+                    // Устройство 520dpi — pixels_per_point ≈ 3.25 для читаемого текста
+                    egui_ctx.set_pixels_per_point(3.25);
+                    // Отступы под системные панели Android (в логических точках)
+                    // Отступ сверху под статус-бар (~45dp при 3.25ppp)
+                    let top_inset = 45.0_f32.min(screen_h / 3.25 * 0.06);
+                    // Отступ снизу под навигационную панель (Home/Back/Recent, ~48dp)
+                    let bottom_inset = 48.0_f32.min(screen_h / 3.25 * 0.06);
+                    let pp = egui_ctx.pixels_per_point();
+                    let raw_input = egui::RawInput {
+                        screen_rect: Some(egui::Rect::from_min_size(
+                            egui::Pos2::new(0.0, top_inset),
+                            egui::vec2(screen_w / pp, (screen_h / pp) - top_inset - bottom_inset),
+                        )),
+                        events: pointer_events.clone(),
+                        ..egui::RawInput::default()
+                    };
                     let full_output = egui_ctx.run(raw_input, |ctx| {
-                        egui::CentralPanel::default().show(ctx, |ui| {
-                            ui.vertical_centered(|ui| {
-                                ui.add_space(50.0);
-                                ui.heading("G-Code Editor");
-                                ui.add_space(20.0);
-                                ui.label(format!("Status: {}", gcode_app.model.status()));
-                                ui.label(format!(
-                                    "File: {}",
-                                    if gcode_app.model.file_path().is_empty() {
-                                        "(none)"
-                                    } else {
-                                        gcode_app.model.file_path()
-                                    }
-                                ));
-                            });
-                        });
+                        use crate::interfaces::gui::view;
+
+                        let is_busy = gcode_app.model.is_busy();
+
+                        // 1. View → Intent: собираем намерения от UI
+                        let mut all_intents = view::collect_intents(ctx, is_busy, &gcode_app.model);
+                        all_intents.extend(view::view_settings(&gcode_app.model, ctx));
+                        all_intents.extend(view::view_exit_dialog(&gcode_app.model, ctx));
+                        all_intents.extend(view::view_shortcuts(&gcode_app.model, ctx));
+                        all_intents.extend(view::view_search_dialog(&mut gcode_app.model, ctx));
+                        all_intents.extend(view::view_replace_dialog(&mut gcode_app.model, ctx));
+                        all_intents.extend(view::view_axis_swap_dialog(&mut gcode_app.model, ctx));
+
+                        // 2. Intent -> model.apply
+                        for intent in &all_intents {
+                            gcode_app.model.apply(intent);
+                        }
+
+                        // 3. View: статусбар и редактор
+                        view::view_statusbar(&gcode_app.model, ctx);
+                        view::view_editor(
+                            &mut gcode_app.model,
+                            ctx,
+                            &gcode_app.cmd_tx,
+                            &mut last_text_change,
+                            &mut pending_text,
+                        );
+
+                        // Если текст изменился — очищаем подсветку ошибок
+                        if pending_text.is_some() {
+                            gcode_app.model.set_error_lines(Vec::new());
+                        }
                     });
 
                     // Очищаем экран тёмно-серым фоном
@@ -227,8 +338,11 @@ mod android {
                         gl.clear(glow::COLOR_BUFFER_BIT);
                     }
 
-                    let size = (800, 600); // фиксированный размер, позже сделаем динамическим
-                    let (w, h) = size;
+                    // Получаем размер окна из native_window (обновляется при InitWindow)
+                    let (w, h) = app
+                        .native_window()
+                        .map(|nw| (nw.width() as u32, nw.height() as u32))
+                        .unwrap_or((1280, 720));
                     let primitives: Vec<egui::epaint::ClippedPrimitive> =
                         egui_ctx.tessellate(full_output.shapes, full_output.pixels_per_point);
                     painter.paint_and_update_textures(

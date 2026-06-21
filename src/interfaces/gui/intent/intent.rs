@@ -62,6 +62,8 @@ pub enum Intent {
     SetAxisSwapMode(AxisSwapMode),
     /// Выполнить замену осей
     ApplyAxisSwap,
+    /// Открыть / закрыть боковое меню (Android Drawer)
+    ToggleDrawer,
 }
 
 /// Режим замены осей

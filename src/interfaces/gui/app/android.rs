@@ -14,7 +14,7 @@ use crate::shared::i18n;
 /// GCodeApp для Android — без eframe, с ручным управлением циклом событий.
 pub struct GCodeApp {
     pub model: Model,
-    cmd_tx: mpsc::Sender<EditorCommand>,
+    pub cmd_tx: mpsc::Sender<EditorCommand>,
     evt_rx: mpsc::Receiver<EditorEvent>,
     last_text_change: Instant,
     pending_text: Option<String>,

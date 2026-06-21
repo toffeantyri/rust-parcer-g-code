@@ -18,146 +18,35 @@ use crate::infrastructure::highlight::build_highlighted_job;
 use crate::interfaces::gui::intent::{AxisSwapMode, Intent};
 use crate::interfaces::gui::model::Model;
 
-/// Собирает намерения от UI: тулбар (меню-бар не используется на Android).
+/// Собирает намерения от UI: Drawer (боковое меню) для Android.
+/// На телефоне узкий экран — всё управление через бургер-меню слева.
 pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &Model) -> Vec<Intent> {
     let mut intents = Vec::new();
+    let drawer_open = model.flag_drawer_open();
 
-    // Верхняя панель — кнопки действий
-    egui::TopBottomPanel::top("toolbar").show(ctx, |ui| {
+    // Верхняя панель — только бургер и имя файла (минимально)
+    egui::TopBottomPanel::top("top_bar").show(ctx, |ui| {
         ui.horizontal(|ui| {
-            // Кнопка меню (гамбургер) — открывает popup с остальными действиями
-            let menu_btn = egui::Button::new("☰").min_size(egui::vec2(36.0, 36.0));
-            let resp = ui.add(menu_btn);
+            // Кнопка бургер — используем id для хранения состояния между кадрами
+            let burger_id = ui.id().with("burger");
+            let btn = egui::Button::new("☰").min_size(egui::vec2(40.0, 40.0));
+            let resp = ui.add(btn);
             if resp.clicked() {
-                // Открываем popup меню
-                ui.memory_mut(|mem| mem.toggle_popup(resp.id));
+                intents.push(Intent::ToggleDrawer);
             }
 
-            // Popup-меню
-            egui::popup::popup_below_widget(ui, resp.id, &resp.rect, |ui| {
-                ui.set_min_width(200.0);
-                if ui
-                    .add_enabled(!is_busy, egui::Button::new(&i18n::locale().menu.open).min_size(egui::vec2(180.0, 36.0)))
-                    .clicked()
-                {
-                    intents.push(Intent::OpenFile);
-                    ui.close_menu();
-                }
-                if ui
-                    .add_enabled(!is_busy, egui::Button::new(&i18n::locale().menu.save).min_size(egui::vec2(180.0, 36.0)))
-                    .clicked()
-                {
-                    intents.push(Intent::SaveFile);
-                    ui.close_menu();
-                }
-                if ui
-                    .add_enabled(!is_busy, egui::Button::new(&i18n::locale().menu.save_as).min_size(egui::vec2(180.0, 36.0)))
-                    .clicked()
-                {
-                    intents.push(Intent::SaveAs);
-                    ui.close_menu();
-                }
-                if ui.button(&i18n::locale().menu.close).clicked() {
-                    intents.push(Intent::CloseFile);
-                    ui.close_menu();
-                }
-                ui.separator();
-                if ui
-                    .add_enabled(!is_busy, egui::Button::new(&i18n::locale().menu.format).min_size(egui::vec2(180.0, 36.0)))
-                    .clicked()
-                {
-                    intents.push(Intent::Format);
-                    ui.close_menu();
-                }
-                if ui
-                    .add_enabled(!is_busy, egui::Button::new(&i18n::locale().menu.validate).min_size(egui::vec2(180.0, 36.0)))
-                    .clicked()
-                {
-                    intents.push(Intent::Validate);
-                    ui.close_menu();
-                }
-                ui.separator();
-                if ui.button(&i18n::locale().menu.search).clicked() {
-                    intents.push(Intent::ToggleSearch);
-                    ui.close_menu();
-                }
-                if ui.button(&i18n::locale().menu.replace).clicked() {
-                    intents.push(Intent::ToggleReplace);
-                    ui.close_menu();
-                }
-                if ui.button(&i18n::locale().menu.axis_swap).clicked() {
-                    intents.push(Intent::ToggleAxisSwap);
-                    ui.close_menu();
-                }
-                ui.separator();
-                if ui.button(&i18n::locale().menu.format_settings).clicked() {
-                    intents.push(Intent::ToggleSettings);
-                    ui.close_menu();
-                }
-                ui.separator();
-                if ui.button(&i18n::locale().menu.shortcuts).clicked() {
-                    intents.push(Intent::ToggleShortcuts);
-                    ui.close_menu();
-                }
-                ui.separator();
-                let is_ru = model.format_settings().language == "ru";
-                if ui
-                    .selectable_label(is_ru, &i18n::locale().menu.lang_ru)
-                    .clicked()
-                    && !is_ru
-                {
-                    intents.push(Intent::SetLanguage("ru".to_string()));
-                    ui.close_menu();
-                }
-                let is_en = model.format_settings().language == "en";
-                if ui
-                    .selectable_label(is_en, &i18n::locale().menu.lang_en)
-                    .clicked()
-                    && !is_en
-                {
-                    intents.push(Intent::SetLanguage("en".to_string()));
-                    ui.close_menu();
-                }
-                ui.separator();
-                if ui.button(&i18n::locale().menu.exit).clicked() {
-                    intents.push(Intent::Exit);
-                    ui.close_menu();
-                }
-            });
-
-            // Быстрые кнопки
-            if ui
-                .add_enabled(!is_busy, egui::Button::new(&i18n::locale().toolbar.open).min_size(egui::vec2(48.0, 36.0)))
-                .clicked()
-            {
-                intents.push(Intent::OpenFile);
-            }
-            if ui
-                .add_enabled(!is_busy, egui::Button::new(&i18n::locale().toolbar.save).min_size(egui::vec2(48.0, 36.0)))
-                .clicked()
-            {
-                intents.push(Intent::SaveFile);
-            }
-            if ui
-                .add_enabled(!is_busy, egui::Button::new(&i18n::locale().toolbar.format).min_size(egui::vec2(64.0, 36.0)))
-                .clicked()
-            {
-                intents.push(Intent::Format);
-            }
-            if ui
-                .add_enabled(!is_busy, egui::Button::new(&i18n::locale().toolbar.check).min_size(egui::vec2(64.0, 36.0)))
-                .clicked()
-            {
-                intents.push(Intent::Validate);
-            }
-
-            // Справа — имя файла (если короткое) или ничего
+            // Имя файла (если есть)
             let path = model.file_path();
-            if !path.is_empty() && path.len() < 30 {
+            if !path.is_empty() {
+                let display = if path.len() > 25 {
+                    format!("...{}", &path[path.len().saturating_sub(22)..])
+                } else {
+                    path.to_string()
+                };
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.label(
-                        egui::RichText::new(path)
-                            .size(12.0)
+                        egui::RichText::new(&display)
+                            .size(14.0)
                             .color(egui::Color32::GRAY)
                             .weak(),
                     );
@@ -166,7 +55,198 @@ pub fn collect_intents(ctx: &egui::Context, is_busy: bool, model: &Model) -> Vec
         });
     });
 
+    // Drawer — боковая панель, показывается по бургеру
+    if drawer_open {
+        egui::SidePanel::left("drawer")
+            .resizable(false)
+            .default_width(260.0)
+            .show(ctx, |ui| {
+                egui::ScrollArea::vertical().show(ui, |ui| {
+                    ui.set_min_width(240.0);
+                    ui.add_space(16.0);
+
+                    // Заголовок
+                    ui.label(egui::RichText::new("G-Code Editor").size(18.0).strong());
+                    ui.separator();
+                    ui.add_space(8.0);
+
+                    // Файл
+                    drawer_section(ui, &i18n::locale().menu.file, |ui| {
+                        drawer_item(
+                            ui,
+                            &i18n::locale().menu.open,
+                            !is_busy,
+                            &mut intents,
+                            Intent::OpenFile,
+                        );
+                        drawer_item(
+                            ui,
+                            &i18n::locale().menu.save,
+                            !is_busy,
+                            &mut intents,
+                            Intent::SaveFile,
+                        );
+                        drawer_item(
+                            ui,
+                            &i18n::locale().menu.save_as,
+                            !is_busy,
+                            &mut intents,
+                            Intent::SaveAs,
+                        );
+                        drawer_item_always(
+                            ui,
+                            &i18n::locale().menu.close,
+                            &mut intents,
+                            Intent::CloseFile,
+                        );
+                    });
+
+                    // Правка
+                    drawer_section(ui, &i18n::locale().menu.edit, |ui| {
+                        drawer_item(
+                            ui,
+                            &i18n::locale().menu.format,
+                            !is_busy,
+                            &mut intents,
+                            Intent::Format,
+                        );
+                        drawer_item(
+                            ui,
+                            &i18n::locale().menu.validate,
+                            !is_busy,
+                            &mut intents,
+                            Intent::Validate,
+                        );
+                    });
+
+                    // Инструменты
+                    drawer_section(ui, "Инструменты", |ui| {
+                        drawer_item_always(
+                            ui,
+                            &i18n::locale().menu.search,
+                            &mut intents,
+                            Intent::ToggleSearch,
+                        );
+                        drawer_item_always(
+                            ui,
+                            &i18n::locale().menu.replace,
+                            &mut intents,
+                            Intent::ToggleReplace,
+                        );
+                        drawer_item_always(
+                            ui,
+                            &i18n::locale().menu.axis_swap,
+                            &mut intents,
+                            Intent::ToggleAxisSwap,
+                        );
+                    });
+
+                    // Настройки
+                    drawer_section(ui, &i18n::locale().menu.settings, |ui| {
+                        drawer_item_always(
+                            ui,
+                            &i18n::locale().menu.format_settings,
+                            &mut intents,
+                            Intent::ToggleSettings,
+                        );
+                    });
+
+                    ui.separator();
+
+                    // Язык
+                    let is_ru = model.format_settings().language == "ru";
+                    let is_en = model.format_settings().language == "en";
+                    if ui
+                        .add(
+                            egui::Button::new(&i18n::locale().menu.lang_ru)
+                                .min_size(egui::vec2(220.0, 40.0))
+                                .selected(is_ru),
+                        )
+                        .clicked()
+                        && !is_ru
+                    {
+                        intents.push(Intent::SetLanguage("ru".to_string()));
+                    }
+                    if ui
+                        .add(
+                            egui::Button::new(&i18n::locale().menu.lang_en)
+                                .min_size(egui::vec2(220.0, 40.0))
+                                .selected(is_en),
+                        )
+                        .clicked()
+                        && !is_en
+                    {
+                        intents.push(Intent::SetLanguage("en".to_string()));
+                    }
+
+                    ui.add_space(8.0);
+                    ui.separator();
+                    ui.add_space(8.0);
+
+                    // О программе и выход
+                    drawer_item_always(
+                        ui,
+                        &i18n::locale().menu.shortcuts,
+                        &mut intents,
+                        Intent::ToggleShortcuts,
+                    );
+                    ui.add_space(16.0);
+                    if ui
+                        .add(
+                            egui::Button::new(&i18n::locale().menu.exit)
+                                .min_size(egui::vec2(220.0, 44.0)),
+                        )
+                        .clicked()
+                    {
+                        intents.push(Intent::Exit);
+                    }
+                });
+            });
+    }
+
     intents
+}
+
+/// Отрисовывает секцию в Drawer с заголовком-разделителем.
+fn drawer_section(ui: &mut egui::Ui, title: &str, add_contents: impl FnOnce(&mut egui::Ui)) {
+    ui.label(
+        egui::RichText::new(title)
+            .size(13.0)
+            .color(egui::Color32::GRAY)
+            .strong(),
+    );
+    ui.add_space(2.0);
+    add_contents(ui);
+    ui.add_space(8.0);
+}
+
+/// Пункт Drawer (enabled).
+fn drawer_item(
+    ui: &mut egui::Ui,
+    label: &str,
+    enabled: bool,
+    intents: &mut Vec<Intent>,
+    intent: Intent,
+) {
+    if ui
+        .add_enabled(
+            enabled,
+            egui::Button::new(label).min_size(egui::vec2(220.0, 40.0)),
+        )
+        .clicked()
+    {
+        intents.push(intent);
+    }
+}
+
+/// Пункт Drawer (всегда включён).
+fn drawer_item_always(ui: &mut egui::Ui, label: &str, intents: &mut Vec<Intent>, intent: Intent) {
+    if ui
+        .add(egui::Button::new(label).min_size(egui::vec2(220.0, 40.0)))
+        .clicked()
+    {
+        intents.push(intent);
+    }
 }
 
 /// Отрисовывает строку состояния.
@@ -215,8 +295,9 @@ pub fn view_settings(model: &Model, ctx: &egui::Context) -> Vec<Intent> {
             ui.horizontal(|ui| {
                 for &step in &[1u32, 10, 100] {
                     let selected = model.format_settings().renumber_step == step;
-                    let btn = egui::Button::new(format!("{}", step)).min_size(egui::vec2(48.0, 36.0));
-                    if ui.add(btn.selectable(selected)).clicked() {
+                    let btn =
+                        egui::Button::new(format!("{}", step)).min_size(egui::vec2(48.0, 36.0));
+                    if ui.add(btn.selected(selected)).clicked() {
                         intents.push(Intent::SetRenumberStep(step));
                     }
                 }
@@ -555,13 +636,20 @@ pub fn view_replace_dialog(model: &mut Model, ctx: &egui::Context) -> Vec<Intent
             let can_replace_all = can_find && !model.replace_with().is_empty();
             ui.horizontal(|ui| {
                 if ui
-                    .add_enabled(can_find, egui::Button::new(&loc.replace.btn_find).min_size(egui::vec2(64.0, 36.0)))
+                    .add_enabled(
+                        can_find,
+                        egui::Button::new(&loc.replace.btn_find).min_size(egui::vec2(64.0, 36.0)),
+                    )
                     .clicked()
                 {
                     intents.push(Intent::ReplaceFindNext);
                 }
                 if ui
-                    .add_enabled(can_replace, egui::Button::new(&loc.replace.btn_replace).min_size(egui::vec2(64.0, 36.0)))
+                    .add_enabled(
+                        can_replace,
+                        egui::Button::new(&loc.replace.btn_replace)
+                            .min_size(egui::vec2(64.0, 36.0)),
+                    )
                     .clicked()
                 {
                     intents.push(Intent::ReplaceOne);
@@ -569,14 +657,17 @@ pub fn view_replace_dialog(model: &mut Model, ctx: &egui::Context) -> Vec<Intent
                 if ui
                     .add_enabled(
                         can_replace_all,
-                        egui::Button::new(&loc.replace.btn_replace_all).min_size(egui::vec2(80.0, 36.0)),
+                        egui::Button::new(&loc.replace.btn_replace_all)
+                            .min_size(egui::vec2(80.0, 36.0)),
                     )
                     .clicked()
                 {
                     intents.push(Intent::ReplaceAll);
                 }
                 if ui
-                    .add(egui::Button::new(&loc.replace.btn_cancel).min_size(egui::vec2(64.0, 36.0)))
+                    .add(
+                        egui::Button::new(&loc.replace.btn_cancel).min_size(egui::vec2(64.0, 36.0)),
+                    )
                     .clicked()
                 {
                     intents.push(Intent::CloseSearchDialog);
@@ -629,15 +720,21 @@ pub fn view_axis_swap_dialog(model: &mut Model, ctx: &egui::Context) -> Vec<Inte
 
             ui.horizontal(|ui| {
                 if ui
-                    .add(egui::Button::new(&loc.axis_swap.mode_swap).min_size(egui::vec2(80.0, 36.0)))
-                    .selectable(is_swap)
+                    .add(
+                        egui::Button::new(&loc.axis_swap.mode_swap)
+                            .min_size(egui::vec2(80.0, 36.0))
+                            .selected(is_swap),
+                    )
                     .clicked()
                 {
                     intents.push(Intent::SetAxisSwapMode(AxisSwapMode::Swap));
                 }
                 if ui
-                    .add(egui::Button::new(&loc.axis_swap.mode_invert).min_size(egui::vec2(80.0, 36.0)))
-                    .selectable(is_invert)
+                    .add(
+                        egui::Button::new(&loc.axis_swap.mode_invert)
+                            .min_size(egui::vec2(80.0, 36.0))
+                            .selected(is_invert),
+                    )
                     .clicked()
                 {
                     intents.push(Intent::SetAxisSwapMode(AxisSwapMode::Invert));
@@ -705,13 +802,20 @@ pub fn view_axis_swap_dialog(model: &mut Model, ctx: &egui::Context) -> Vec<Inte
             };
             ui.horizontal(|ui| {
                 if ui
-                    .add_enabled(can_apply, egui::Button::new(&loc.axis_swap.btn_apply).min_size(egui::vec2(80.0, 36.0)))
+                    .add_enabled(
+                        can_apply,
+                        egui::Button::new(&loc.axis_swap.btn_apply)
+                            .min_size(egui::vec2(80.0, 36.0)),
+                    )
                     .clicked()
                 {
                     intents.push(Intent::ApplyAxisSwap);
                 }
                 if ui
-                    .add(egui::Button::new(&loc.axis_swap.btn_cancel).min_size(egui::vec2(80.0, 36.0)))
+                    .add(
+                        egui::Button::new(&loc.axis_swap.btn_cancel)
+                            .min_size(egui::vec2(80.0, 36.0)),
+                    )
                     .clicked()
                 {
                     intents.push(Intent::ToggleAxisSwap);

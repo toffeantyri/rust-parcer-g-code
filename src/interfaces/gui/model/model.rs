@@ -56,6 +56,8 @@ pub struct Model {
     axis_swap_axis2: String,
     /// Замена осей: ось для инвертирования (режим Invert)
     axis_invert_axis: String,
+    /// Android Drawer: открыто ли боковое меню
+    drawer_open: bool,
 }
 
 impl Model {
@@ -151,6 +153,9 @@ impl Model {
     }
     pub fn axis_invert_axis(&self) -> &str {
         &self.axis_invert_axis
+    }
+    pub fn flag_drawer_open(&self) -> bool {
+        self.drawer_open
     }
 }
 
@@ -250,6 +255,9 @@ impl Model {
     }
     pub fn set_axis_invert_axis(&mut self, v: String) {
         self.axis_invert_axis = v;
+    }
+    pub fn set_drawer_open(&mut self, v: bool) {
+        self.drawer_open = v;
     }
 }
 

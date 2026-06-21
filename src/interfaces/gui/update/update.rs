@@ -238,6 +238,9 @@ impl Model {
             Intent::SetInvertAxis(axis) => {
                 self.set_axis_invert_axis(axis.clone());
             }
+            Intent::ToggleDrawer => {
+                self.set_drawer_open(!self.flag_drawer_open());
+            }
             Intent::ApplyAxisSwap => {
                 let content = self.content().to_string();
                 let result = match self.axis_swap_mode() {
