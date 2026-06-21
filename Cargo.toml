@@ -6,9 +6,9 @@ edition = "2021"
 description = "A parser and formatter library in Rust"
 
 [features]
-android = []  # feature-флаг для Android-сборки
+android = ["dep:egui_glow", "dep:glow"]  # Android-сборка: egui_glow + glow
 desktop = ["dep:eframe", "dep:rfd"]  # десктопные зависимости
-default = []  # не включаем ничего по умолчанию, десктопный бинарник включает desktop в Cargo.toml
+default = []  # не включаем ничего по умолчанию
 
 [lib]
 name = "code_parser"
@@ -36,8 +36,8 @@ logos = "0.14"
 
 # GUI — egui работает на всех платформах
 egui = "0.31"
-egui_glow = { version = "0.31", features = ["winit"] }
-glow = "0.16"
+egui_glow = { version = "0.31", optional = true }
+glow = { version = "0.16", optional = true }
 
 # Десктоп (eframe + rfd)
 eframe = { version = "0.31", default-features = false, features = ["default", "glow", "wgpu", "x11"], optional = true }

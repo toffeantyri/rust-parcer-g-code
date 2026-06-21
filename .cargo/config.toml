@@ -2,3 +2,10 @@
 # Все тесты, включая GUI, запускать последовательно
 # из-за глобального состояния i18n::LANG
 # TODO: убрать глобальное состояние, убрать это ограничение
+
+[target.aarch64-linux-android]
+linker = "/usr/bin/clang"
+rustflags = [
+    "-C", "link-args=--sysroot=/home/toffeantyri/android-ndk-stub/sysroot",
+    "-C", "link-args=-target aarch64-linux-android",
+]
