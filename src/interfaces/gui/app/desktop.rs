@@ -357,7 +357,7 @@ impl eframe::App for GCodeApp {
         }
 
         // 1. View → Intent: собираем намерения от UI
-        let mut all_intents = view::collect_intents(ctx, is_busy, &self.model);
+        let mut all_intents = view::collect_intents(ctx, is_busy, &mut self.model);
         all_intents.extend(view::view_settings(&self.model, ctx));
         all_intents.extend(view::view_exit_dialog(&self.model, ctx));
         all_intents.extend(view::view_shortcuts(&self.model, ctx));

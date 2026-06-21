@@ -2,11 +2,11 @@
 //!
 //! Содержит трейт `FilePicker` и реализации для десктопа и Android.
 
-#[cfg(not(target_os = "android"))]
+#[cfg(feature = "desktop")]
 #[path = "desktop.rs"]
 mod platform_impl;
 
-#[cfg(target_os = "android")]
+#[cfg(not(feature = "desktop"))]
 #[path = "android.rs"]
 mod platform_impl;
 

@@ -26,10 +26,10 @@ fn with_i18n_lock() -> std::sync::MutexGuard<'static, ()> {
 fn test_menu_file_items() {
     let _lock = with_i18n_lock();
     i18n::set_lang("en");
-    let model = Model::default();
+    let mut model = Model::default();
 
     let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
-        let _intents = collect_intents(ui.ctx(), false, &model);
+        let _intents = collect_intents(ui.ctx(), false, &mut model);
     });
     harness.run();
 
@@ -51,10 +51,10 @@ fn test_menu_file_items() {
 fn test_menu_file_items_ru() {
     let _lock = with_i18n_lock();
     i18n::set_lang("ru");
-    let model = Model::default();
+    let mut model = Model::default();
 
     let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
-        let _intents = collect_intents(ui.ctx(), false, &model);
+        let _intents = collect_intents(ui.ctx(), false, &mut model);
     });
     harness.run();
 
@@ -80,10 +80,10 @@ fn test_menu_file_items_ru() {
 fn test_menu_edit_items() {
     let _lock = with_i18n_lock();
     i18n::set_lang("en");
-    let model = Model::default();
+    let mut model = Model::default();
 
     let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
-        let _intents = collect_intents(ui.ctx(), false, &model);
+        let _intents = collect_intents(ui.ctx(), false, &mut model);
     });
     harness.run();
 
@@ -106,10 +106,10 @@ fn test_menu_edit_items() {
 fn test_toolbar_buttons() {
     let _lock = with_i18n_lock();
     i18n::set_lang("en");
-    let model = Model::default();
+    let mut model = Model::default();
 
     let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
-        let _intents = collect_intents(ui.ctx(), false, &model);
+        let _intents = collect_intents(ui.ctx(), false, &mut model);
     });
     harness.run();
 
@@ -127,7 +127,7 @@ fn test_toolbar_buttons_disabled_when_busy() {
     model.set_is_busy(true);
 
     let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
-        let _intents = collect_intents(ui.ctx(), false, &model);
+        let _intests = collect_intents(ui.ctx(), false, &mut model);
     });
     harness.run();
 
@@ -317,7 +317,7 @@ fn test_settings_menu_language_toggle() {
     });
 
     let mut harness = Harness::new_ui(move |ui: &mut egui::Ui| {
-        let _intents = collect_intents(ui.ctx(), false, &model);
+        let _intents = collect_intents(ui.ctx(), false, &mut model);
     });
     harness.run();
 

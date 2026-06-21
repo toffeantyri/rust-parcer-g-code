@@ -1,12 +1,12 @@
 //! Слой App — точка входа, связывает UI с data layer.
 //! desktop.rs — десктоп (eframe), android.rs — Android (android-activity).
 
-#[cfg(not(target_os = "android"))]
+#[cfg(feature = "desktop")]
 #[path = "desktop.rs"]
 #[allow(clippy::module_inception)]
 mod app;
 
-#[cfg(target_os = "android")]
+#[cfg(any(target_os = "android", not(feature = "desktop")))]
 #[path = "android.rs"]
 #[allow(clippy::module_inception)]
 mod app;
