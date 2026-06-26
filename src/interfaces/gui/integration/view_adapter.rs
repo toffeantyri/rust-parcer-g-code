@@ -103,14 +103,6 @@ fn view_drawer_overlay(state: &AppState, ctx: &egui::Context, msgs: &mut Vec<Msg
             ui.painter()
                 .rect_filled(overlay_rect, 0.0, egui::Color32::from_black_alpha(100));
         });
-
-    if ctx.input(|i| i.pointer.any_pressed()) {
-        if let Some(pos) = ctx.input(|i| i.pointer.interact_pos()) {
-            if pos.x > 260.0 {
-                msgs.push(Msg::ToggleDrawer);
-            }
-        }
-    }
 }
 
 // ── Боковое меню Drawer ──
@@ -122,104 +114,127 @@ fn view_drawer(state: &AppState, ctx: &egui::Context, msgs: &mut Vec<Msg>) {
         .resizable(false)
         .default_width(260.0)
         .show(ctx, |ui| {
-            egui::ScrollArea::vertical().show(ui, |ui| {
-                ui.set_min_width(240.0);
-                ui.add_space(16.0);
+            egui::ScrollArea::vertical()
+                .id_source("drawer_scroll")
+                .drag_to_scroll(false)
+                .scroll_bar_visibility(egui::scroll_area::ScrollBarVisibility::AlwaysVisible)
+                .show(ui, |ui| {
+                    ui.set_min_width(240.0);
+                    ui.add_space(16.0);
 
-                ui.label(egui::RichText::new("G-Code Editor").size(18.0).strong());
-                ui.separator();
-                ui.add_space(8.0);
+                    ui.label(egui::RichText::new("G-Code Editor").size(18.0).strong());
+                    ui.separator();
+                    ui.add_space(8.0);
 
-                drawer_section(ui, &i18n::locale().menu.file, |ui| {
-                    drawer_item(ui, &i18n::locale().menu.open, !is_busy, msgs, Msg::OpenFile);
-                    drawer_item(ui, &i18n::locale().menu.save, !is_busy, msgs, Msg::SaveFile);
-                    drawer_item(
-                        ui,
-                        &i18n::locale().menu.save_as,
-                        !is_busy,
-                        msgs,
-                        Msg::SaveAs,
-                    );
-                    drawer_item_always(ui, &i18n::locale().menu.close, msgs, Msg::CloseFile);
-                });
+                    drawer_section(ui, &i18n::locale().menu.file, |ui| {
+                        drawer_item(ui, &i18n::locale().menu.open, !is_busy, msgs, Msg::OpenFile);
+                        drawer_item(ui, &i18n::locale().menu.save, !is_busy, msgs, Msg::SaveFile);
+                        drawer_item(
+                            ui,
+                            &i18n::locale().menu.save_as,
+                            !is_busy,
+                            msgs,
+                            Msg::SaveAs,
+                        );
+                        drawer_item_always(ui, &i18n::locale().menu.close, msgs, Msg::CloseFile);
+                    });
 
-                drawer_section(ui, &i18n::locale().menu.edit, |ui| {
-                    drawer_item(ui, &i18n::locale().menu.format, !is_busy, msgs, Msg::Format);
-                    drawer_item(
-                        ui,
-                        &i18n::locale().menu.validate,
-                        !is_busy,
-                        msgs,
-                        Msg::Validate,
-                    );
-                    drawer_item_always(ui, &i18n::locale().menu.search, msgs, Msg::ToggleSearch);
-                    drawer_item_always(ui, &i18n::locale().menu.replace, msgs, Msg::ToggleReplace);
+                    drawer_section(ui, &i18n::locale().menu.edit, |ui| {
+                        drawer_item(ui, &i18n::locale().menu.format, !is_busy, msgs, Msg::Format);
+                        drawer_item(
+                            ui,
+                            &i18n::locale().menu.validate,
+                            !is_busy,
+                            msgs,
+                            Msg::Validate,
+                        );
+                        drawer_item_always(
+                            ui,
+                            &i18n::locale().menu.search,
+                            msgs,
+                            Msg::ToggleSearch,
+                        );
+                        drawer_item_always(
+                            ui,
+                            &i18n::locale().menu.replace,
+                            msgs,
+                            Msg::ToggleReplace,
+                        );
+                        drawer_item_always(
+                            ui,
+                            &i18n::locale().menu.axis_swap,
+                            msgs,
+                            Msg::ToggleAxisSwap,
+                        );
+                    });
+
+                    drawer_section(ui, &i18n::locale().menu.settings, |ui| {
+                        drawer_item_always(
+                            ui,
+                            &i18n::locale().menu.format_settings,
+                            msgs,
+                            Msg::ToggleSettings,
+                        );
+                    });
+
+                    ui.separator();
+
+                    let is_ru = state.format_settings.language == "ru";
+                    let is_en = state.format_settings.language == "en";
+                    if ui
+                        .add(
+                            egui::Button::new(&i18n::locale().menu.lang_ru)
+                                .min_size(egui::vec2(220.0, 40.0))
+                                .selected(is_ru),
+                        )
+                        .clicked()
+                        && !is_ru
+                    {
+                        msgs.push(Msg::SetLanguage("ru".to_string()));
+                    }
+                    if ui
+                        .add(
+                            egui::Button::new(&i18n::locale().menu.lang_en)
+                                .min_size(egui::vec2(220.0, 40.0))
+                                .selected(is_en),
+                        )
+                        .clicked()
+                        && !is_en
+                    {
+                        msgs.push(Msg::SetLanguage("en".to_string()));
+                    }
+
+                    ui.add_space(8.0);
+                    ui.separator();
+                    ui.add_space(8.0);
+
                     drawer_item_always(
                         ui,
-                        &i18n::locale().menu.axis_swap,
+                        &i18n::locale().menu.shortcuts,
                         msgs,
-                        Msg::ToggleAxisSwap,
+                        Msg::ToggleShortcuts,
                     );
+                    ui.add_space(16.0);
+                    if ui
+                        .add(
+                            egui::Button::new(&i18n::locale().menu.exit)
+                                .min_size(egui::vec2(220.0, 44.0)),
+                        )
+                        .clicked()
+                    {
+                        msgs.push(Msg::Exit);
+                    }
                 });
-
-                drawer_section(ui, &i18n::locale().menu.settings, |ui| {
-                    drawer_item_always(
-                        ui,
-                        &i18n::locale().menu.format_settings,
-                        msgs,
-                        Msg::ToggleSettings,
-                    );
-                });
-
-                ui.separator();
-
-                let is_ru = state.format_settings.language == "ru";
-                let is_en = state.format_settings.language == "en";
-                if ui
-                    .add(
-                        egui::Button::new(&i18n::locale().menu.lang_ru)
-                            .min_size(egui::vec2(220.0, 40.0))
-                            .selected(is_ru),
-                    )
-                    .clicked()
-                    && !is_ru
-                {
-                    msgs.push(Msg::SetLanguage("ru".to_string()));
-                }
-                if ui
-                    .add(
-                        egui::Button::new(&i18n::locale().menu.lang_en)
-                            .min_size(egui::vec2(220.0, 40.0))
-                            .selected(is_en),
-                    )
-                    .clicked()
-                    && !is_en
-                {
-                    msgs.push(Msg::SetLanguage("en".to_string()));
-                }
-
-                ui.add_space(8.0);
-                ui.separator();
-                ui.add_space(8.0);
-
-                drawer_item_always(
-                    ui,
-                    &i18n::locale().menu.shortcuts,
-                    msgs,
-                    Msg::ToggleShortcuts,
-                );
-                ui.add_space(16.0);
-                if ui
-                    .add(
-                        egui::Button::new(&i18n::locale().menu.exit)
-                            .min_size(egui::vec2(220.0, 44.0)),
-                    )
-                    .clicked()
-                {
-                    msgs.push(Msg::Exit);
-                }
-            });
         });
+
+    // Тач вне Drawer (правее 260px) — закрываем
+    if ctx.input(|i| i.pointer.any_pressed()) {
+        if let Some(pos) = ctx.input(|i| i.pointer.interact_pos()) {
+            if pos.x > 260.0 {
+                msgs.push(Msg::ToggleDrawer);
+            }
+        }
+    }
 }
 
 fn drawer_section(ui: &mut egui::Ui, title: &str, add_contents: impl FnOnce(&mut egui::Ui)) {
