@@ -83,19 +83,22 @@ impl Application for GCodeApp {
     }
 
     fn frame(&mut self, egui_ctx: &egui::Context, raw_input: egui::RawInput) -> egui::FullOutput {
-        // 1. Синхронизируем снепшот с последним состоянием из Store
+        // 1. Корректируем DPI: на Android плотность ~2.5-3.5x.
+        //    Ставим pixels_per_point = 1.5 для комфортного размера.
+        egui_ctx.set_pixels_per_point(2.8);
+
+        // 2. Синхронизируем снепшот с последним состоянием из Store
         self.root.sync_from_store();
 
-        // 2. Рендерим UI и собираем сообщения
+        // 3. Рендерим UI и собираем сообщения
         let mut messages = Vec::new();
         let output = egui_ctx.run(raw_input, |ctx| {
             egui::CentralPanel::default().show(ctx, |ui| {
-                // Рендерим через Component::render
                 messages = self.root.render(ui);
             });
         });
 
-        // 3. Обрабатываем сообщения: логируем + отправляем в Data Layer
+        // 4. Обрабатываем сообщения: логируем + отправляем в Data Layer
         for msg in messages {
             self.root.handle(msg.clone());
             let _ = self.cmd_tx.send(msg);
