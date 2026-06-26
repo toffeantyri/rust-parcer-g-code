@@ -6,7 +6,7 @@ edition = "2021"
 description = "A parser and formatter library in Rust"
 
 [features]
-android = ["dep:egui_glow", "dep:glow"]  # Android-сборка: egui_glow + glow
+android = ["dep:egui-android-framework"]  # Android-сборка: только framework (он тянет egui_glow)
 desktop = ["dep:eframe", "dep:rfd", "dep:egui_kittest"]  # десктопные зависимости
 default = []  # не включаем ничего по умолчанию
 
@@ -38,6 +38,10 @@ logos = "0.14"
 egui = "0.31"
 egui_glow = { version = "0.31", optional = true }
 glow = { version = "0.16", optional = true }
+android-activity = "0.6"
+
+# Android framework (egui-android-framework)
+egui-android-framework = { version = "0.2.0-alpha.1", optional = true }
 
 # Десктоп (eframe + rfd)
 eframe = { version = "0.31", default-features = false, features = ["default", "glow", "wgpu", "x11"], optional = true }
@@ -53,12 +57,7 @@ serde_yaml = "0.9"
 
 # Android (не собирается на десктопе)
 [target.'cfg(target_os = "android")'.dependencies]
-android-activity = { version = "0.6", features = ["native-activity"] }
-android_logger = "0.14"
 log = "0.4"
-glutin = { version = "0.31", default-features = false, features = ["egl"] }
-ndk = { version = "0.9", features = ["rwh_05"] }
-raw-window-handle = "0.5"
 
 [build-dependencies]
 

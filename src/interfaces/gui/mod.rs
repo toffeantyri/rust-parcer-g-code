@@ -15,6 +15,9 @@ pub use view::{
     view_settings, view_shortcuts, view_statusbar,
 };
 
+#[cfg(any(target_os = "android", not(feature = "desktop")))]
+pub(crate) mod integration;
+
 pub(crate) mod app;
 pub(crate) mod intent;
 pub(crate) mod model;

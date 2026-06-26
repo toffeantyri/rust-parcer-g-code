@@ -364,7 +364,7 @@ impl DataLayer {
     }
 }
 
-mod pipeline;
+pub mod pipeline;
 
 #[cfg(test)]
 #[path = "data_layer_tests.rs"]

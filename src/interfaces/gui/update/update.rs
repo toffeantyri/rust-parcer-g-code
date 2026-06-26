@@ -274,7 +274,7 @@ fn find_all_occurrences(haystack: &str, needle: &str) -> Vec<usize> {
 
 /// Меняет местами две оси в тексте G-кода.
 /// Например, swap Z и X: "G0 X10 Z20" → "G0 Z10 X20"
-pub(crate) fn swap_axes(text: &str, axis1: &str, axis2: &str) -> String {
+pub fn swap_axes(text: &str, axis1: &str, axis2: &str) -> String {
     if axis1.len() != 1 || axis2.len() != 1 || axis1 == axis2 {
         return text.to_string();
     }
@@ -426,7 +426,7 @@ fn invert_expression(expr: &str) -> String {
 }
 
 /// Инвертирует знак у указанной оси в тексте G-кода.
-pub(crate) fn invert_axes_by_letter(text: &str, axis_letter: &str) -> String {
+pub fn invert_axes_by_letter(text: &str, axis_letter: &str) -> String {
     if axis_letter.len() != 1 {
         return text.to_string();
     }
