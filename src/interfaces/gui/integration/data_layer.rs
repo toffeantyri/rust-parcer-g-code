@@ -43,7 +43,10 @@ fn handle_msg(msg: Msg, store: &StateStore<AppState>, notify_tx: &mpsc::Sender<(
     match msg {
         // ── Изменения состояния без пайплайна ──
         Msg::ToggleSettings => {
-            store.update(|s| s.settings_open = !s.settings_open);
+            store.update(|s| {
+                s.settings_open = !s.settings_open;
+                s.drawer_open = false; // закрываем drawer при открытии диалога
+            });
             notify(notify_tx);
         }
         Msg::SetRenumberStep(step) => {
@@ -55,12 +58,16 @@ fn handle_msg(msg: Msg, store: &StateStore<AppState>, notify_tx: &mpsc::Sender<(
             notify(notify_tx);
         }
         Msg::ToggleShortcuts => {
-            store.update(|s| s.shortcuts_open = !s.shortcuts_open);
+            store.update(|s| {
+                s.shortcuts_open = !s.shortcuts_open;
+                s.drawer_open = false;
+            });
             notify(notify_tx);
         }
         Msg::ToggleSearch => {
             store.update(|s| {
                 s.search_open = !s.search_open;
+                s.drawer_open = false;
                 if s.search_open {
                     s.search_focus_needed = true;
                 }
@@ -70,6 +77,7 @@ fn handle_msg(msg: Msg, store: &StateStore<AppState>, notify_tx: &mpsc::Sender<(
         Msg::ToggleReplace => {
             store.update(|s| {
                 s.replace_open = !s.replace_open;
+                s.drawer_open = false;
                 if s.replace_open {
                     s.replace_focus_needed = true;
                 }
@@ -84,11 +92,25 @@ fn handle_msg(msg: Msg, store: &StateStore<AppState>, notify_tx: &mpsc::Sender<(
             notify(notify_tx);
         }
         Msg::ToggleAxisSwap => {
-            store.update(|s| s.axis_swap_open = !s.axis_swap_open);
+            store.update(|s| {
+                s.axis_swap_open = !s.axis_swap_open;
+                s.drawer_open = false;
+            });
             notify(notify_tx);
         }
         Msg::ToggleDrawer => {
-            store.update(|s| s.drawer_open = !s.drawer_open);
+            store.update(|s| {
+                s.drawer_open = !s.drawer_open;
+                // При открытии drawer закрываем все диалоги
+                if s.drawer_open {
+                    s.settings_open = false;
+                    s.search_open = false;
+                    s.replace_open = false;
+                    s.shortcuts_open = false;
+                    s.axis_swap_open = false;
+                    s.show_exit_dialog = false;
+                }
+            });
             notify(notify_tx);
         }
         Msg::SetSearchQuery(q) => {

@@ -85,7 +85,7 @@ impl Application for GCodeApp {
     fn frame(&mut self, egui_ctx: &egui::Context, raw_input: egui::RawInput) -> egui::FullOutput {
         // 1. Корректируем DPI: на Android плотность ~2.5-3.5x.
         //    Ставим pixels_per_point = 1.5 для комфортного размера.
-        egui_ctx.set_pixels_per_point(2.8);
+        egui_ctx.set_pixels_per_point(3.0);
 
         // 2. Синхронизируем снепшот с последним состоянием из Store
         self.root.sync_from_store();

@@ -366,28 +366,6 @@ fn view_settings_dialog(state: &AppState, ctx: &egui::Context, msgs: &mut Vec<Ms
                 msgs.push(Msg::SetSkipEmptyLines(skip));
             }
 
-            ui.add_space(8.0);
-
-            ui.horizontal(|ui| {
-                let is_ru = state.format_settings.language == "ru";
-                let is_en = state.format_settings.language == "en";
-                if ui
-                    .selectable_label(is_ru, &i18n::locale().menu.lang_ru)
-                    .clicked()
-                    && !is_ru
-                {
-                    msgs.push(Msg::SetLanguage("ru".to_string()));
-                }
-                if ui
-                    .selectable_label(is_en, &i18n::locale().menu.lang_en)
-                    .clicked()
-                    && !is_en
-                {
-                    msgs.push(Msg::SetLanguage("en".to_string()));
-                }
-            });
-
-            ui.add_space(8.0);
             if ui.button(&i18n::locale().dialog.btn_cancel).clicked() {
                 msgs.push(Msg::ToggleSettings);
             }
